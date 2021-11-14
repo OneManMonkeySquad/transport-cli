@@ -1,4 +1,4 @@
-# CLI for binary releases and patching
+# CLI for binary releases and patching 🚢
 
 CLI tool to distribute (incremental) releases to users. Different release streams are supported (via *tags*).
 
@@ -7,27 +7,27 @@ To host the files you need a webserver. SFTP is used to upload the files while H
 
 ## How to use
 First you need to copy transport.toml.example to transport.toml. This file configures which backend is used (local, sftp, http) and the requied parameters.
-As a developer you would use the SFTP backend to upload patches while the end user should use the http backend.
+As a developer you would use the SFTP backend to upload patches while the end user should use the read-only HTTP backend.
 
 Once configured, create a base patch:
-```powershell
+```
 tp base C:/path_to_app
-> base:271df855-2056-4bd5-b6ba-f7d14857820e
+base:271df855-2056-4bd5-b6ba-f7d14857820e
 ```
 Upload the patch:
-```powershell
+```
 tp commit latest base:271df855-2056-4bd5-b6ba-f7d14857820e
 ```
 
 Test the download:
-```powershell
+```
 tp restore latest C:/app_release_test
 ```
 
 Create patch:
-```powershell
+```
 tp patch latest C:/path_to_app
-> patch:e310512b-fefe-42d6-90b5-bca96730411a
+patch:e310512b-fefe-42d6-90b5-bca96730411a
 ```
 
 Upload the patch:
