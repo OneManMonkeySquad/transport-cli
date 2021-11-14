@@ -1,0 +1,16 @@
+# Select which backend is used
+backend="sftp"
+
+# Local backend for testing
+[local]
+path="..."
+
+# SFTP backend
+[sftp]
+host="..."
+user="..."
+pw="..."
+
+# HTTP read-only backend for end users
+[http]
+host="..."
