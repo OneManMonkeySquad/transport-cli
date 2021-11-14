@@ -13,9 +13,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/ssh"
-
-	"github.com/pelletier/go-toml"
 )
 
 type Backend interface {
@@ -563,45 +560,15 @@ func restore(persistence Backend) {
 	}
 }
 
-func readConfig() (Backend, error) {
-	cfg, err := toml.LoadFile("transport.toml")
+func tags(persistence Backend) {
+	db, err := downloadDatabase(persistence)
 	if err != nil {
-		return nil, err
+		fmt.Println("Patch database not found.")
+		return
 	}
 
-	backendType := cfg.Get("backend").(string)
-
-	if strings.EqualFold(backendType, "sftp") {
-		host := cfg.Get("sftp.host").(string)
-		user := cfg.GetDefault("sftp.user", "").(string)
-		password := cfg.GetDefault("sftp.pw", "").(string)
-
-		sshConfig := &ssh.ClientConfig{
-			User: user,
-			Auth: []ssh.AuthMethod{ssh.Password(password)},
-		}
-		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
-
-		backend, err := NewSFTP(host, sshConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		return backend, nil
-	} else if strings.EqualFold(backendType, "local") {
-		path := cfg.Get("local.path").(string)
-
-		backend := NewLocal(path)
-
-		return backend, nil
-	} else if strings.EqualFold(backendType, "http") {
-		host := cfg.Get("http.host").(string)
-
-		backend := NewHTTP(host)
-
-		return backend, nil
-	} else {
-		return nil, errors.New("unknown backend '" + backendType + "'")
+	for _, tag := range db.Tags {
+		fmt.Println(tag.Name)
 	}
 }
 
@@ -611,6 +578,7 @@ func main() {
 		fmt.Println("tp patch {tag} {dir}")
 		fmt.Println("tp commit {tag} {patch_guid}")
 		fmt.Println("tp restore {tag} {dir}")
+		fmt.Println("tp tags")
 		return
 	}
 
@@ -630,6 +598,8 @@ func main() {
 		commit(backend)
 	} else if command == "restore" {
 		restore(backend)
+	} else if command == "tags" {
+		tags(backend)
 	} else {
 		fmt.Println("Unknown command", command)
 	}
