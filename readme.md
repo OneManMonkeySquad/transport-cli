@@ -6,8 +6,7 @@ To host the files you need a webserver. SFTP is used to upload the files while H
 
 
 ## How to use
-First you need to copy transport.toml.example to transport.toml. This file configures which backend is used (local, sftp, http) and the requied parameters.
-As a developer you would use the SFTP backend to upload patches while the end user should use the read-only HTTP backend.
+First you need to copy *transport.toml.example* to *transport.toml* and insert your data. Note that you can use the *local* backend to get a feel for how transport works.
 
 Once configured, create a base patch:
 ```

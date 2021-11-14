@@ -1,5 +1,6 @@
 # Select which backend is used
-backend="sftp"
+# The backend is used to store/load files, including the patch database and the patches themselves
+backend="local"
 
 # Local backend for testing
 [local]

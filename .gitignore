@@ -4,3 +4,5 @@ transport.toml
 out/
 base/
 derived/
+local_db/
+staging/
