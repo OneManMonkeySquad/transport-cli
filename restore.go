@@ -123,17 +123,18 @@ func restore(backend Backend) {
 	for _, entry := range flatPatch.Entries {
 		filePath := filepath.Join(path, entry.FileName)
 
-		var hash [32]byte
+		hashStr := ""
 
 		existingContent, err := os.ReadFile(filePath)
 		if err == nil {
-			hash = sha256.Sum256(existingContent)
+			hash := sha256.Sum256(existingContent)
+			hashStr = hex.EncodeToString(hash[:])
 		}
 
-		if hash != entry.SHA256Hash {
+		if hashStr != entry.SHA256Hash {
 			fmt.Println("New", filePath)
 
-			newContent, err := backend.DownloadFile(hex.EncodeToString(entry.SHA256Hash[:]))
+			newContent, err := backend.DownloadFile(entry.SHA256Hash)
 			if err != nil {
 				log.Fatal(err)
 				return

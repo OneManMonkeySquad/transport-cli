@@ -40,8 +40,9 @@ func base() {
 			}
 
 			hash := sha256.Sum256(content)
+			hashStr := hex.EncodeToString(hash[:])
 
-			err = os.WriteFile("staging/"+hex.EncodeToString(hash[:]), content, 0644)
+			err = os.WriteFile("staging/"+hashStr, content, 0644)
 			if err != nil {
 				log.Fatal(err)
 				return
@@ -49,7 +50,7 @@ func base() {
 
 			entry := BaseEntry{
 				FileName:   file.Name(),
-				SHA256Hash: hash,
+				SHA256Hash: hashStr,
 			}
 			baseFile.Entries = append(baseFile.Entries, entry)
 		}

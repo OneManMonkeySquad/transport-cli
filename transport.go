@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"log"
@@ -19,7 +18,7 @@ type Backend interface {
 // Entries
 type BaseEntry struct {
 	FileName   string
-	SHA256Hash [sha256.Size]byte
+	SHA256Hash string
 }
 
 type DeletedEntry struct {

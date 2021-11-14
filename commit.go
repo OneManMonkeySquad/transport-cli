@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -35,7 +34,7 @@ func commit(backend Backend) {
 			newEntryID = base.ID
 			newBaseID = uuid.Nil
 			for _, entry := range base.Entries {
-				dataFiles = append(dataFiles, hex.EncodeToString(entry.SHA256Hash[:]))
+				dataFiles = append(dataFiles, entry.SHA256Hash)
 			}
 		} else if strings.HasPrefix(fileTypeAndGuid, "patch:") {
 			filePath = "staging/" + fileTypeAndGuid[6:] + ".json"
@@ -43,7 +42,7 @@ func commit(backend Backend) {
 			newEntryID = patch.ID
 			newBaseID = patch.BaseID
 			for _, entry := range patch.Changed {
-				dataFiles = append(dataFiles, hex.EncodeToString(entry.SHA256Hash[:]))
+				dataFiles = append(dataFiles, entry.SHA256Hash)
 			}
 		} else {
 			fmt.Println("Not a valid patch identifier", fileTypeAndGuid)

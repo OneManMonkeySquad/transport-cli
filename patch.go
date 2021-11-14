@@ -95,8 +95,10 @@ func createPatch(srcDir string, baseFile BaseFile) (*PatchFile, error) {
 		}
 
 		hash := sha256.Sum256(content)
-		if hash != baseEntry.SHA256Hash {
-			err = os.WriteFile("staging/"+hex.EncodeToString(hash[:]), content, 0644)
+		hashStr := hex.EncodeToString(hash[:])
+
+		if hashStr != baseEntry.SHA256Hash {
+			err = os.WriteFile("staging/"+hashStr, content, 0644)
 			if err != nil {
 				log.Fatal(err)
 				return nil, err
@@ -104,7 +106,7 @@ func createPatch(srcDir string, baseFile BaseFile) (*PatchFile, error) {
 
 			var changed BaseEntry
 			changed.FileName = baseEntry.FileName
-			changed.SHA256Hash = hash
+			changed.SHA256Hash = hashStr
 			patch.Changed = append(patch.Changed, changed)
 			continue
 		}
