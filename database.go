@@ -21,7 +21,7 @@ type Database struct {
 	Entries []DatabaseEntry
 }
 
-func findTag(db *Database, name string) uuid.UUID {
+func (db *Database) findTag(name string) uuid.UUID {
 	for _, tag := range db.Tags {
 		if tag.Name == name {
 			return tag.ID
@@ -30,7 +30,7 @@ func findTag(db *Database, name string) uuid.UUID {
 	return uuid.Nil
 }
 
-func findEntry(db *Database, id uuid.UUID) *DatabaseEntry {
+func (db *Database) findEntry(id uuid.UUID) *DatabaseEntry {
 	for _, entry := range db.Entries {
 		if entry.ID == id {
 			return &entry

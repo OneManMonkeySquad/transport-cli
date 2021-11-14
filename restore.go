@@ -22,7 +22,7 @@ func findRestoreChain(db *Database, head uuid.UUID) []DatabaseEntry {
 	{
 		var currentHead = head
 		for currentHead != uuid.Nil {
-			entry := findEntry(db, currentHead)
+			entry := db.findEntry(currentHead)
 			if entry == nil {
 				log.Fatal("Patch not found")
 			}
@@ -108,7 +108,7 @@ func restore(backend Backend) {
 	path := os.Args[3]
 	fmt.Println("Restoring '" + tagName + "' to '" + path + "'...")
 
-	head := findTag(db, tagName)
+	head := db.findTag(tagName)
 
 	restoreChain := findRestoreChain(db, head)
 

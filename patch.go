@@ -29,13 +29,13 @@ func patch(backend Backend) {
 	}
 
 	tagName := os.Args[2]
-	tag := findTag(db, tagName)
+	tag := db.findTag(tagName)
 	if tag == uuid.Nil {
 		log.Fatal("Tag not found", tagName)
 		return
 	}
 
-	entry := findEntry(db, tag)
+	entry := db.findEntry(tag)
 	if entry == nil {
 		log.Fatal("Entry for tag not found. Existing database not consistent", tagName)
 		return
