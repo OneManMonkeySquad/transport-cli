@@ -24,17 +24,18 @@ func main() {
 	defer backend.Close()
 
 	command := os.Args[1]
-	if command == "base" {
+	switch command {
+	case "base":
 		base()
-	} else if command == "patch" {
+	case "patch":
 		patch(backend)
-	} else if command == "commit" {
+	case "commit":
 		commit(backend)
-	} else if command == "restore" {
+	case "restore":
 		restore(backend)
-	} else if command == "tags" {
+	case "tags":
 		tags(backend)
-	} else {
+	default:
 		log.Fatal("Unknown command", command)
 	}
 }
