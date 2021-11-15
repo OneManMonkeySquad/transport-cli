@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/jlaffaye/ftp v0.0.0-20211029032751-b1140299f4df // indirect
+	github.com/jotfs/fastcdc-go v0.2.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.0-beta.4 // indirect

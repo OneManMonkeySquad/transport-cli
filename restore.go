@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +18,80 @@ import (
 type FlatPatch struct {
 	Entries []BaseEntry
 	Deleted []DeletedEntry
+}
+
+func restore(backend Backend) {
+	if len(os.Args) <= 3 {
+		fmt.Println("tp restore {tag} {dir}")
+		return
+	}
+
+	db, err := downloadDatabase(backend)
+	if err != nil {
+		fmt.Println("Patch database not found.")
+		return
+	}
+
+	tagName := os.Args[2]
+	path := os.Args[3]
+	fmt.Println("Restoring '" + tagName + "' to '" + path + "'...")
+
+	head := db.findTag(tagName)
+
+	restoreChain := findRestoreChain(db, head)
+
+	// Now, instead of just going through patches, we collapse them into one.
+	// This way we don't write a single file multiple times or write and then delete a file.
+	flatPatch, err := flattenRestoreChain(db, restoreChain, backend)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	for _, entry := range flatPatch.Entries {
+		filePath := filepath.Join(path, entry.FileName)
+
+		hashStr := ""
+
+		existingContent, err := os.ReadFile(filePath)
+		if err == nil {
+			hash := sha256.Sum256(existingContent)
+			hashStr = hex.EncodeToString(hash[:])
+		}
+
+		if hashStr != entry.Hash {
+			fmt.Println("New", filePath)
+
+			newContent, err := backend.DownloadFile(entry.Hash)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			f, err := os.Create(filePath)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			r, err := zlib.NewReader(bytes.NewBuffer(newContent))
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			defer r.Close()
+
+			io.Copy(f, r)
+		} else {
+			fmt.Println("Equal Hash", filePath)
+		}
+	}
+	for _, entry := range flatPatch.Deleted {
+		filePath := filepath.Join(path, entry.FileName)
+		fmt.Println("Delete", filePath)
+
+		os.Remove(filePath)
+	}
 }
 
 func findRestoreChain(db *Database, head uuid.UUID) []DatabaseEntry {
@@ -90,65 +167,4 @@ func flattenRestoreChain(db *Database, restoreChain []DatabaseEntry, persistence
 	}
 
 	return &result, nil
-}
-
-func restore(backend Backend) {
-	if len(os.Args) <= 3 {
-		fmt.Println("tp restore {tag} {dir}")
-		return
-	}
-
-	db, err := downloadDatabase(backend)
-	if err != nil {
-		fmt.Println("Patch database not found.")
-		return
-	}
-
-	tagName := os.Args[2]
-	path := os.Args[3]
-	fmt.Println("Restoring '" + tagName + "' to '" + path + "'...")
-
-	head := db.findTag(tagName)
-
-	restoreChain := findRestoreChain(db, head)
-
-	// Now, instead of just going through patches, we collapse them into one.
-	// This way we don't write a single file multiple times or write and then delete a file.
-	flatPatch, err := flattenRestoreChain(db, restoreChain, backend)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	for _, entry := range flatPatch.Entries {
-		filePath := filepath.Join(path, entry.FileName)
-
-		hashStr := ""
-
-		existingContent, err := os.ReadFile(filePath)
-		if err == nil {
-			hash := sha256.Sum256(existingContent)
-			hashStr = hex.EncodeToString(hash[:])
-		}
-
-		if hashStr != entry.SHA256Hash {
-			fmt.Println("New", filePath)
-
-			newContent, err := backend.DownloadFile(entry.SHA256Hash)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-
-			os.WriteFile(filePath, newContent, 0644)
-		} else {
-			fmt.Println("Equal Hash", filePath)
-		}
-	}
-	for _, entry := range flatPatch.Deleted {
-		filePath := filepath.Join(path, entry.FileName)
-		fmt.Println("Delete", filePath)
-
-		os.Remove(filePath)
-	}
 }

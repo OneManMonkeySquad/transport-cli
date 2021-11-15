@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -19,60 +20,33 @@ func patch(backend Backend) {
 		return
 	}
 
-	db, err := downloadDatabase(backend)
-	if err == os.ErrNotExist {
-		fmt.Println("No Database found. Make sure you have uploaded at least one base patch.")
-		return
-	} else if err != nil {
-		log.Fatal(err)
-		return
-	}
-
 	tagName := os.Args[2]
-	tag := db.findTag(tagName)
-	if tag == uuid.Nil {
-		log.Fatal("Tag not found", tagName)
-		return
-	}
+	srcDir := os.Args[3]
 
-	entry := db.findEntry(tag)
-	if entry == nil {
-		log.Fatal("Entry for tag not found. Existing database not consistent", tagName)
-		return
-	}
-
-	entryContent, err := backend.DownloadFile(entry.ID.String() + ".json")
+	baseFile, err := fetchBase(tagName, backend)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	var baseFile BaseFile
-	err = json.Unmarshal(entryContent, &baseFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if baseFile.Version != 1 {
-		log.Fatal("Base file has wrong version")
-		return
-	}
-
-	patch, err := createPatch(os.Args[3], baseFile)
+	patch, err := createPatch(srcDir, baseFile)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	writeJson(patch, "staging/"+patch.ID.String()+".json")
+	writeToJsonFile(patch, "staging/"+patch.ID.String()+".json")
+
 	fmt.Println("patch:" + patch.ID.String())
 }
 
-func createPatch(srcDir string, baseFile BaseFile) (*PatchFile, error) {
+func createPatch(srcDir string, baseFile *BaseFile) (*PatchFile, error) {
 	var patch PatchFile
 	patch.Version = 1
 	patch.ID = uuid.New()
 	patch.BaseID = baseFile.ID
+
+	existingFileSet := make(map[string]struct{})
 
 	for _, baseEntry := range baseFile.Entries {
 		filePath := filepath.Join(srcDir, baseEntry.FileName)
@@ -89,6 +63,8 @@ func createPatch(srcDir string, baseFile BaseFile) (*PatchFile, error) {
 			continue
 		}
 
+		existingFileSet[baseEntry.FileName] = struct{}{}
+
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, err
@@ -97,19 +73,47 @@ func createPatch(srcDir string, baseFile BaseFile) (*PatchFile, error) {
 		hash := sha256.Sum256(content)
 		hashStr := hex.EncodeToString(hash[:])
 
-		if hashStr != baseEntry.SHA256Hash {
-			err = os.WriteFile("staging/"+hashStr, content, 0644)
+		if hashStr != baseEntry.Hash {
+			changed, err := add(hashStr, baseEntry.FileName, content)
 			if err != nil {
-				log.Fatal(err)
 				return nil, err
 			}
 
-			var changed BaseEntry
-			changed.FileName = baseEntry.FileName
-			changed.SHA256Hash = hashStr
-			patch.Changed = append(patch.Changed, changed)
+			patch.Changed = append(patch.Changed, *changed)
+		}
+	}
+
+	files, err := os.ReadDir(srcDir)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(existingFileSet)
+
+	for _, file := range files {
+		_, exists := existingFileSet[file.Name()]
+		if exists {
+			fmt.Println(file.Name() + " exists")
 			continue
 		}
+		fmt.Println(file.Name() + " is new")
+
+		filePath := filepath.Join(srcDir, file.Name())
+
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		hash := sha256.Sum256(content)
+		hashStr := hex.EncodeToString(hash[:])
+
+		changed, err := add(hashStr, file.Name(), content)
+		if err != nil {
+			return nil, err
+		}
+
+		patch.Changed = append(patch.Changed, *changed)
 	}
 
 	if len(patch.Changed) == 0 && len(patch.Deleted) == 0 {
@@ -117,4 +121,61 @@ func createPatch(srcDir string, baseFile BaseFile) (*PatchFile, error) {
 	}
 
 	return &patch, nil
+}
+
+func add(hashStr string, fileName string, content []byte) (*BaseEntry, error) {
+	f, err := os.Create("staging/" + hashStr)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	w := zlib.NewWriter(f)
+	defer w.Close()
+
+	_, err = w.Write(content)
+	if err != nil {
+		return nil, err
+	}
+
+	var changed BaseEntry
+	changed.FileName = fileName
+	changed.Hash = hashStr
+
+	return &changed, nil
+}
+
+func fetchBase(tagName string, backend Backend) (*BaseFile, error) {
+	db, err := downloadDatabase(backend)
+	if err == os.ErrNotExist {
+		return nil, errors.New("no database found; make sure you have uploaded at least one base patch")
+	} else if err != nil {
+		return nil, err
+	}
+
+	tag := db.findTag(tagName)
+	if tag == uuid.Nil {
+		return nil, fmt.Errorf("tag '%v' not found", tagName)
+	}
+
+	entry := db.findEntry(tag)
+	if entry == nil {
+		return nil, fmt.Errorf("entry for tag '%v' not found; existing database not consistent", tagName)
+	}
+
+	entryContent, err := backend.DownloadFile(entry.ID.String() + ".json")
+	if err != nil {
+		return nil, err
+	}
+
+	var baseFile BaseFile
+	if err = json.Unmarshal(entryContent, &baseFile); err != nil {
+		return nil, err
+	}
+
+	if baseFile.Version != 1 {
+		return nil, errors.New("base file has wrong version")
+	}
+
+	return &baseFile, nil
 }

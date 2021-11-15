@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -20,42 +21,62 @@ func base() {
 	srcDir := os.Args[2]
 
 	var baseFile BaseFile
-	{
-		baseFile.Version = 1
-		baseFile.ID = uuid.New()
+	baseFile.Version = 1
+	baseFile.ID = uuid.New()
 
-		files, err := os.ReadDir(srcDir)
+	files, err := os.ReadDir(srcDir)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	for _, file := range files {
+		entry, err := processBaseFile(srcDir, file.Name())
 		if err != nil {
 			log.Fatal(err)
 			return
 		}
 
-		for _, file := range files {
-			filePath := filepath.Join(srcDir, file.Name())
+		baseFile.Entries = append(baseFile.Entries, *entry)
+	}
 
-			content, err := os.ReadFile(filePath)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
+	writeToJsonFile(baseFile, "staging/"+baseFile.ID.String()+".json")
 
-			hash := sha256.Sum256(content)
-			hashStr := hex.EncodeToString(hash[:])
+	fmt.Println("base:" + baseFile.ID.String())
+}
 
-			err = os.WriteFile("staging/"+hashStr, content, 0644)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
+func processBaseFile(srcDir string, fileName string) (*BaseEntry, error) {
+	filePath := filepath.Join(srcDir, fileName)
 
-			entry := BaseEntry{
-				FileName:   file.Name(),
-				SHA256Hash: hashStr,
-			}
-			baseFile.Entries = append(baseFile.Entries, entry)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := sha256.Sum256(content)
+	hashStr := hex.EncodeToString(hash[:])
+
+	// Compress and write data blob
+	{
+		f, err := os.Create("staging/" + hashStr)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		w := zlib.NewWriter(f)
+		defer w.Close()
+
+		_, err = w.Write(content)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	writeJson(baseFile, "staging/"+baseFile.ID.String()+".json")
-	fmt.Println("base:" + baseFile.ID.String())
+	// Add entry
+	entry := BaseEntry{
+		FileName: fileName,
+		Hash:     hashStr,
+	}
+	return &entry, nil
 }

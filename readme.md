@@ -63,7 +63,7 @@ Print existing tags. F.i. stable, development, latest, ...
 
 
 ## Development status
-Basic workflow is working. Files are only changed when needed (MD5 hash). File deletions are included too. File contents are not patched incrementally yet.
+Basic workflow is working. Files are only changed when needed (SHA256 hash). File deletions are included too. File contents are not patched incrementally yet. File blobs are zlib compressed.
 
 Do we need a self updater?
 Do we need an example gui?

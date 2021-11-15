@@ -16,12 +16,12 @@ func commit(backend Backend) {
 	}
 
 	updateTagName := os.Args[2]
+	fileTypeAndGuid := os.Args[3]
+
 	if strings.ContainsAny(updateTagName, " .:;'#+*~") {
 		fmt.Println("Tag name contains invalid chars", updateTagName)
 		return
 	}
-
-	fileTypeAndGuid := os.Args[3]
 
 	var newEntryID uuid.UUID
 	var newBaseID uuid.UUID
@@ -34,7 +34,7 @@ func commit(backend Backend) {
 			newEntryID = base.ID
 			newBaseID = uuid.Nil
 			for _, entry := range base.Entries {
-				dataFiles = append(dataFiles, entry.SHA256Hash)
+				dataFiles = append(dataFiles, entry.Hash)
 			}
 		} else if strings.HasPrefix(fileTypeAndGuid, "patch:") {
 			filePath = "staging/" + fileTypeAndGuid[6:] + ".json"
@@ -42,7 +42,7 @@ func commit(backend Backend) {
 			newEntryID = patch.ID
 			newBaseID = patch.BaseID
 			for _, entry := range patch.Changed {
-				dataFiles = append(dataFiles, entry.SHA256Hash)
+				dataFiles = append(dataFiles, entry.Hash)
 			}
 		} else {
 			fmt.Println("Not a valid patch identifier", fileTypeAndGuid)
@@ -101,16 +101,13 @@ func commit(backend Backend) {
 
 	// Upload datas
 	for _, dataFile := range dataFiles {
-		filePath := "staging/" + dataFile
-
-		data, err := os.ReadFile(filePath)
+		data, err := os.ReadFile("staging/" + dataFile)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		err = backend.UploadFile(dataFile, data)
-		if err != nil {
+		if err = backend.UploadFile(dataFile, data); err != nil {
 			fmt.Println(err)
 			return
 		}
@@ -132,8 +129,7 @@ func commit(backend Backend) {
 	}
 
 	// Upload DB
-	err = uploadDatabase(db, backend)
-	if err != nil {
+	if err = uploadDatabase(db, backend); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -142,7 +138,6 @@ func commit(backend Backend) {
 	os.Remove(filePath)
 
 	for _, dataFile := range dataFiles {
-		filePath := "staging/" + dataFile
-		os.Remove(filePath)
+		os.Remove("staging/" + dataFile)
 	}
 }

@@ -17,8 +17,8 @@ type Backend interface {
 
 // Entries
 type BaseEntry struct {
-	FileName   string
-	SHA256Hash string
+	FileName string
+	Hash     string
 }
 
 type DeletedEntry struct {
@@ -36,6 +36,7 @@ type PatchFile struct {
 	Version int
 	ID      uuid.UUID
 	BaseID  uuid.UUID
+	// Contains new and changed files
 	Changed []BaseEntry
 	Deleted []DeletedEntry
 }
@@ -51,7 +52,7 @@ func exists(name string) (bool, error) {
 	return false, err
 }
 
-func writeJson(v interface{}, path string) {
+func writeToJsonFile(v interface{}, path string) {
 	str, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		log.Fatal(err)
