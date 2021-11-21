@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func base() {
+func base(cfg *Config) {
 	if len(os.Args) <= 2 {
 		fmt.Println("tp base {directory}")
 		return
@@ -24,29 +25,56 @@ func base() {
 	baseFile.Version = 1
 	baseFile.ID = uuid.New()
 
-	files, err := os.ReadDir(srcDir)
+	err := processDir(cfg, srcDir, ".", &baseFile.Entries)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	for _, file := range files {
-		entry, err := processBaseFile(srcDir, file.Name())
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-
-		baseFile.Entries = append(baseFile.Entries, *entry)
+	if len(baseFile.Entries) == 0 {
+		log.Fatal("No entries - folder empty?")
+		return
 	}
 
-	writeToJsonFile(baseFile, "staging/"+baseFile.ID.String()+".json")
+	os.Mkdir("staging", 0777)
+	err = writeToJsonFile(baseFile, "staging/"+baseFile.ID.String()+".json")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	fmt.Println("base:" + baseFile.ID.String())
 }
 
-func processBaseFile(srcDir string, fileName string) (*BaseEntry, error) {
-	filePath := filepath.Join(srcDir, fileName)
+func processDir(cfg *Config, dir string, subDir string, entries *[]BaseEntry) error {
+	fullDir := filepath.Join(dir, subDir)
+
+	dirEntries, err := os.ReadDir(fullDir)
+	if err != nil {
+		return err
+	}
+
+	for _, dirEntry := range dirEntries {
+		if !dirEntry.IsDir() {
+			entry, err := processBaseFile(cfg, dir, subDir, dirEntry.Name())
+			if err != nil {
+				return err
+			}
+
+			*entries = append(*entries, *entry)
+		} else {
+			newSubDir := filepath.Join(subDir, dirEntry.Name())
+			if err = processDir(cfg, dir, newSubDir, entries); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func processBaseFile(cfg *Config, dir string, subDir string, fileName string) (*BaseEntry, error) {
+	filePath := filepath.Join(dir, subDir, fileName)
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -57,17 +85,32 @@ func processBaseFile(srcDir string, fileName string) (*BaseEntry, error) {
 	hashStr := hex.EncodeToString(hash[:])
 
 	// Compress and write data blob
+	buf := new(bytes.Buffer)
 	{
-		f, err := os.Create("staging/" + hashStr)
+		zlibWriter := zlib.NewWriter(buf)
+		defer zlibWriter.Close()
+
+		_, err = zlibWriter.Write(content)
 		if err != nil {
 			return nil, err
 		}
-		defer f.Close()
+	}
 
-		w := zlib.NewWriter(f)
-		defer w.Close()
+	numChunks := (buf.Len() / cfg.ChunkSize()) + 1
 
-		_, err = w.Write(content)
+	for i := 0; i < numChunks; i += 1 {
+		name := "staging/" + hashStr
+		if i > 0 {
+			name = fmt.Sprintf("%s_%d", name, i)
+		}
+
+		file, err := os.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		_, err = file.Write(buf.Next(cfg.ChunkSize()))
 		if err != nil {
 			return nil, err
 		}
@@ -75,8 +118,9 @@ func processBaseFile(srcDir string, fileName string) (*BaseEntry, error) {
 
 	// Add entry
 	entry := BaseEntry{
-		FileName: fileName,
-		Hash:     hashStr,
+		FileName:         filepath.Join(subDir, fileName),
+		Hash:             hashStr,
+		AdditionalChunks: numChunks - 1,
 	}
 	return &entry, nil
 }

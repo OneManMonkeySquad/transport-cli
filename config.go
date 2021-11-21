@@ -4,18 +4,32 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/OneManMonkeySquad/transport-cli/backends"
+
 	"github.com/pelletier/go-toml"
 	"golang.org/x/crypto/ssh"
 )
 
-func readConfig() (Backend, error) {
+type Config struct {
+	Backend     Backend
+	ChunkSizeMb int
+}
+
+func (cfg *Config) ChunkSize() int {
+	return cfg.ChunkSizeMb * 1024 * 1024
+}
+
+func readConfig() (*Config, error) {
 	cfg, err := toml.LoadFile("transport.toml")
 	if err != nil {
 		return nil, err
 	}
 
+	chunkSize := (int)(cfg.Get("chunk_size_mb").(int64))
+
 	backendType := cfg.Get("backend").(string)
 
+	var backend Backend
 	if strings.EqualFold(backendType, "sftp") {
 		host := cfg.Get("sftp.host").(string)
 		user := cfg.GetDefault("sftp.user", "").(string)
@@ -27,25 +41,25 @@ func readConfig() (Backend, error) {
 		}
 		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 
-		backend, err := NewSFTP(host, sshConfig)
+		backend, err = backends.NewSFTP(host, sshConfig)
 		if err != nil {
 			return nil, err
 		}
-
-		return backend, nil
 	} else if strings.EqualFold(backendType, "local") {
 		path := cfg.Get("local.path").(string)
 
-		backend := NewLocal(path)
-
-		return backend, nil
+		backend = backends.NewLocal(path)
 	} else if strings.EqualFold(backendType, "http") {
 		host := cfg.Get("http.host").(string)
 
-		backend := NewHTTP(host)
-
-		return backend, nil
+		backend = backends.NewHTTP(host)
 	} else {
 		return nil, errors.New("unknown backend '" + backendType + "'")
 	}
+
+	config := Config{
+		ChunkSizeMb: chunkSize,
+		Backend:     backend,
+	}
+	return &config, nil
 }

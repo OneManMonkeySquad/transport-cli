@@ -16,25 +16,25 @@ func main() {
 		return
 	}
 
-	backend, err := readConfig()
+	cfg, err := readConfig()
 	if err != nil {
 		log.Fatalf("Configuration invalid: %v", err)
 		return
 	}
-	defer backend.Close()
+	defer cfg.Backend.Close()
 
 	command := os.Args[1]
 	switch command {
 	case "base":
-		base()
+		base(cfg)
 	case "patch":
-		patch(backend)
+		patch(cfg)
 	case "commit":
-		commit(backend)
+		commit(cfg.Backend)
 	case "restore":
-		restore(backend)
+		restore(cfg.Backend)
 	case "tags":
-		tags(backend)
+		tags(cfg.Backend)
 	default:
 		log.Fatal("Unknown command", command)
 	}

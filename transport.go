@@ -17,8 +17,9 @@ type Backend interface {
 
 // Entries
 type BaseEntry struct {
-	FileName string
-	Hash     string
+	FileName         string
+	Hash             string
+	AdditionalChunks int `json:"AdditionalChunks,omitempty"`
 }
 
 type DeletedEntry struct {
@@ -52,13 +53,13 @@ func exists(name string) (bool, error) {
 	return false, err
 }
 
-func writeToJsonFile(v interface{}, path string) {
+func writeToJsonFile(v interface{}, path string) error {
 	str, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	os.WriteFile(path, str, 0644)
+	return os.WriteFile(path, str, 0644)
 }
 
 func readBaseFile(path string) BaseFile {

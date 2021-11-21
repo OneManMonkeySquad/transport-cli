@@ -34,7 +34,7 @@ func restore(backend Backend) {
 
 	tagName := os.Args[2]
 	path := os.Args[3]
-	fmt.Println("Restoring '" + tagName + "' to '" + path + "'...")
+	fmt.Printf("Restoring '%s' to '%s'...\n", tagName, path)
 
 	head := db.findTag(tagName)
 
@@ -62,26 +62,47 @@ func restore(backend Backend) {
 		if hashStr != entry.Hash {
 			fmt.Println("New", filePath)
 
-			newContent, err := backend.DownloadFile(entry.Hash)
+			var buffer = new(bytes.Buffer)
+			for i := 0; i < entry.AdditionalChunks+1; i += 1 {
+				name := entry.Hash
+				if i > 0 {
+					name = fmt.Sprintf("%s_%d", name, i)
+				}
+
+				fmt.Println("Downloading", name, "...")
+				newContent, err := backend.DownloadFile(name)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+
+				buffer.Write(newContent)
+			}
+
+			// Create directory
+			dirName := filepath.Dir(filePath)
+			if _, err := os.Stat(dirName); err != nil {
+				if err := os.MkdirAll(dirName, os.ModePerm); err != nil {
+					log.Fatal(err)
+					return
+				}
+			}
+
+			// Write file
+			file, err := os.Create(filePath)
 			if err != nil {
 				log.Fatal(err)
 				return
 			}
 
-			f, err := os.Create(filePath)
+			zlibReader, err := zlib.NewReader(buffer)
 			if err != nil {
 				log.Fatal(err)
 				return
 			}
+			defer zlibReader.Close()
 
-			r, err := zlib.NewReader(bytes.NewBuffer(newContent))
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			defer r.Close()
-
-			io.Copy(f, r)
+			io.Copy(file, zlibReader)
 		} else {
 			fmt.Println("Equal Hash", filePath)
 		}

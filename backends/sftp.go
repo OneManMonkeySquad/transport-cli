@@ -1,4 +1,4 @@
-package main
+package backends
 
 import (
 	"bytes"
@@ -9,26 +9,26 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type sftp_persistence struct {
+type sftpPersistence struct {
 	client *sftp.Client
 }
 
-func NewSFTP(host string, config *ssh.ClientConfig) (*sftp_persistence, error) {
+func NewSFTP(host string, config *ssh.ClientConfig) (*sftpPersistence, error) {
 	client, err := connectSFTP(host, config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &sftp_persistence{
+	return &sftpPersistence{
 		client: client,
 	}, nil
 }
 
-func (p *sftp_persistence) Close() {
+func (p *sftpPersistence) Close() {
 	p.client.Close()
 }
 
-func (p *sftp_persistence) UploadFile(fileName string, data []byte) error {
+func (p *sftpPersistence) UploadFile(fileName string, data []byte) error {
 	f, err := p.client.Create(fileName)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func (p *sftp_persistence) UploadFile(fileName string, data []byte) error {
 	return nil
 }
 
-func (p *sftp_persistence) DownloadFile(fileName string) ([]byte, error) {
+func (p *sftpPersistence) DownloadFile(fileName string) ([]byte, error) {
 	f, err := p.client.Open(fileName)
 	if err != nil {
 		return nil, err

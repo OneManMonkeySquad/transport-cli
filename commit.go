@@ -34,7 +34,14 @@ func commit(backend Backend) {
 			newEntryID = base.ID
 			newBaseID = uuid.Nil
 			for _, entry := range base.Entries {
-				dataFiles = append(dataFiles, entry.Hash)
+				for i := 0; i < entry.AdditionalChunks+1; i += 1 {
+					name := entry.Hash
+					if i > 0 {
+						name = fmt.Sprintf("%s_%d", name, i)
+					}
+
+					dataFiles = append(dataFiles, name)
+				}
 			}
 		} else if strings.HasPrefix(fileTypeAndGuid, "patch:") {
 			filePath = "staging/" + fileTypeAndGuid[6:] + ".json"

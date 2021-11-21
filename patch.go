@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func patch(backend Backend) {
+func patch(cfg *Config) {
 	if len(os.Args) <= 3 {
 		fmt.Println("tp patch {tag} {directory}")
 		return
@@ -23,13 +24,15 @@ func patch(backend Backend) {
 	tagName := os.Args[2]
 	srcDir := os.Args[3]
 
-	baseFile, err := fetchBase(tagName, backend)
+	baseFile, err := fetchBase(tagName, cfg.Backend)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	patch, err := createPatch(srcDir, baseFile)
+	os.Mkdir("staging", 0777)
+
+	patch, err := createPatch(cfg, srcDir, baseFile)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -40,7 +43,7 @@ func patch(backend Backend) {
 	fmt.Println("patch:" + patch.ID.String())
 }
 
-func createPatch(srcDir string, baseFile *BaseFile) (*PatchFile, error) {
+func createPatch(cfg *Config, srcDir string, baseFile *BaseFile) (*PatchFile, error) {
 	var patch PatchFile
 	patch.Version = 1
 	patch.ID = uuid.New()
@@ -74,7 +77,7 @@ func createPatch(srcDir string, baseFile *BaseFile) (*PatchFile, error) {
 		hashStr := hex.EncodeToString(hash[:])
 
 		if hashStr != baseEntry.Hash {
-			changed, err := add(hashStr, baseEntry.FileName, content)
+			changed, err := add(cfg, hashStr, baseEntry.FileName, content)
 			if err != nil {
 				return nil, err
 			}
@@ -108,7 +111,7 @@ func createPatch(srcDir string, baseFile *BaseFile) (*PatchFile, error) {
 		hash := sha256.Sum256(content)
 		hashStr := hex.EncodeToString(hash[:])
 
-		changed, err := add(hashStr, file.Name(), content)
+		changed, err := add(cfg, hashStr, file.Name(), content)
 		if err != nil {
 			return nil, err
 		}
@@ -123,24 +126,39 @@ func createPatch(srcDir string, baseFile *BaseFile) (*PatchFile, error) {
 	return &patch, nil
 }
 
-func add(hashStr string, fileName string, content []byte) (*BaseEntry, error) {
-	f, err := os.Create("staging/" + hashStr)
-	if err != nil {
-		return nil, err
+func add(cfg *Config, hashStr string, fileName string, content []byte) (*BaseEntry, error) {
+	buf := new(bytes.Buffer)
+	{
+		zlibWriter := zlib.NewWriter(buf)
+		defer zlibWriter.Close()
+
+		_, err := zlibWriter.Write(content)
+		if err != nil {
+			return nil, err
+		}
 	}
-	defer f.Close()
 
-	w := zlib.NewWriter(f)
-	defer w.Close()
+	numChunks := (buf.Len() / cfg.ChunkSize()) + 1
 
-	_, err = w.Write(content)
-	if err != nil {
-		return nil, err
+	for i := 0; i < numChunks; i += 1 {
+		name := "staging/" + hashStr
+		if i > 0 {
+			name = fmt.Sprintf("%s_%d", name, i)
+		}
+
+		f, err := os.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		f.Write(buf.Next(cfg.ChunkSize()))
 	}
 
 	var changed BaseEntry
 	changed.FileName = fileName
 	changed.Hash = hashStr
+	changed.AdditionalChunks = numChunks - 1
 
 	return &changed, nil
 }

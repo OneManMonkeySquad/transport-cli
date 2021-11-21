@@ -3,6 +3,8 @@ module github.com/OneManMonkeySquad/transport-cli
 go 1.17
 
 require (
+	github.com/asticode/go-astikit v0.22.0 // indirect
+	github.com/asticode/go-astilectron v0.25.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/jlaffaye/ftp v0.0.0-20211029032751-b1140299f4df // indirect
 	github.com/jotfs/fastcdc-go v0.2.0 // indirect

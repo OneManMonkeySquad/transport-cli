@@ -1,4 +1,4 @@
-package main
+package backends
 
 import (
 	"bytes"
@@ -8,28 +8,28 @@ import (
 	"strings"
 )
 
-type http_persistence struct {
+type httpPersistence struct {
 	host string
 }
 
-func NewHTTP(host string) *http_persistence {
+func NewHTTP(host string) *httpPersistence {
 	if !strings.HasSuffix(host, "/") {
 		host += "/"
 	}
 
-	return &http_persistence{
+	return &httpPersistence{
 		host: host,
 	}
 }
 
-func (p *http_persistence) Close() {
+func (p *httpPersistence) Close() {
 }
 
-func (p *http_persistence) UploadFile(fileName string, data []byte) error {
+func (p *httpPersistence) UploadFile(fileName string, data []byte) error {
 	return errors.New("http backend is read-only")
 }
 
-func (p *http_persistence) DownloadFile(fileName string) ([]byte, error) {
+func (p *httpPersistence) DownloadFile(fileName string) ([]byte, error) {
 	resp, err := http.Get(p.host + fileName)
 	if err != nil {
 		return nil, err
