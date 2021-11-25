@@ -148,13 +148,13 @@ func flattenRestoreChain(db *Database, restoreChain []DatabaseEntry, persistence
 		}
 
 		if i == 0 {
-			var baseFile BaseFile
+			var baseFile PatchFile
 			err = json.Unmarshal(patchContent, &baseFile)
 			if err != nil {
 				return nil, err
 			}
 
-			for _, entry := range baseFile.Entries {
+			for _, entry := range baseFile.Changed {
 				entryMap[entry.FileName] = entry
 			}
 		} else {

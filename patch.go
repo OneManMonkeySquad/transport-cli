@@ -30,6 +30,7 @@ func patch(cfg *Config) {
 		return
 	}
 
+	os.RemoveAll("staging")
 	os.Mkdir("staging", 0777)
 
 	patch, err := createPatch(cfg, srcDir, baseFile)
@@ -38,20 +39,19 @@ func patch(cfg *Config) {
 		return
 	}
 
-	writeToJsonFile(patch, "staging/"+patch.ID.String()+".json")
-
-	fmt.Println("patch:" + patch.ID.String())
+	writeToJsonFile(patch, "staging/staged.json")
 }
 
-func createPatch(cfg *Config, srcDir string, baseFile *BaseFile) (*PatchFile, error) {
-	var patch PatchFile
-	patch.Version = 1
-	patch.ID = uuid.New()
-	patch.BaseID = baseFile.ID
+func createPatch(cfg *Config, srcDir string, baseFile *PatchFile) (*PatchFile, error) {
+	patch := PatchFile{
+		Version: 1,
+		ID:      uuid.New(),
+		BaseID:  baseFile.ID,
+	}
 
 	existingFileSet := make(map[string]struct{})
 
-	for _, baseEntry := range baseFile.Entries {
+	for _, baseEntry := range baseFile.Changed {
 		filePath := filepath.Join(srcDir, baseEntry.FileName)
 
 		stillExits, err := exists(filePath)
@@ -86,37 +86,9 @@ func createPatch(cfg *Config, srcDir string, baseFile *BaseFile) (*PatchFile, er
 		}
 	}
 
-	files, err := os.ReadDir(srcDir)
+	err := foo(cfg, srcDir, existingFileSet, &patch)
 	if err != nil {
 		return nil, err
-	}
-
-	fmt.Println(existingFileSet)
-
-	for _, file := range files {
-		_, exists := existingFileSet[file.Name()]
-		if exists {
-			fmt.Println(file.Name() + " exists")
-			continue
-		}
-		fmt.Println(file.Name() + " is new")
-
-		filePath := filepath.Join(srcDir, file.Name())
-
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, err
-		}
-
-		hash := sha256.Sum256(content)
-		hashStr := hex.EncodeToString(hash[:])
-
-		changed, err := add(cfg, hashStr, file.Name(), content)
-		if err != nil {
-			return nil, err
-		}
-
-		patch.Changed = append(patch.Changed, *changed)
 	}
 
 	if len(patch.Changed) == 0 && len(patch.Deleted) == 0 {
@@ -124,6 +96,48 @@ func createPatch(cfg *Config, srcDir string, baseFile *BaseFile) (*PatchFile, er
 	}
 
 	return &patch, nil
+}
+
+func foo(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch *PatchFile) error {
+	files, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		_, exists := existingFileSet[file.Name()]
+		if exists {
+			continue
+		}
+
+		if file.IsDir() {
+			err := foo(cfg, filepath.Join(srcDir, file.Name()), existingFileSet, patch)
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		filePath := filepath.Join(srcDir, file.Name())
+
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return err
+		}
+
+		hash := sha256.Sum256(content)
+		hashStr := hex.EncodeToString(hash[:])
+
+		changed, err := add(cfg, hashStr, file.Name(), content)
+		if err != nil {
+			return err
+		}
+
+		patch.Changed = append(patch.Changed, *changed)
+	}
+
+	return nil
 }
 
 func add(cfg *Config, hashStr string, fileName string, content []byte) (*BaseEntry, error) {
@@ -163,7 +177,7 @@ func add(cfg *Config, hashStr string, fileName string, content []byte) (*BaseEnt
 	return &changed, nil
 }
 
-func fetchBase(tagName string, backend Backend) (*BaseFile, error) {
+func fetchBase(tagName string, backend Backend) (*PatchFile, error) {
 	db, err := downloadDatabase(backend)
 	if err == os.ErrNotExist {
 		return nil, errors.New("no database found; make sure you have uploaded at least one base patch")
@@ -186,7 +200,7 @@ func fetchBase(tagName string, backend Backend) (*BaseFile, error) {
 		return nil, err
 	}
 
-	var baseFile BaseFile
+	var baseFile PatchFile
 	if err = json.Unmarshal(entryContent, &baseFile); err != nil {
 		return nil, err
 	}

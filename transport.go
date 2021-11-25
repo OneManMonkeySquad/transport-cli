@@ -27,12 +27,6 @@ type DeletedEntry struct {
 }
 
 // Files
-type BaseFile struct {
-	Version int
-	ID      uuid.UUID
-	Entries []BaseEntry
-}
-
 type PatchFile struct {
 	Version int
 	ID      uuid.UUID
@@ -60,24 +54,6 @@ func writeToJsonFile(v interface{}, path string) error {
 	}
 
 	return os.WriteFile(path, str, 0644)
-}
-
-func readBaseFile(path string) BaseFile {
-	fileData, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var baseFile BaseFile
-	err = json.Unmarshal(fileData, &baseFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if baseFile.Version != 1 {
-		log.Fatal("Base file has wrong version")
-	}
-	return baseFile
 }
 
 func readPatchFile(path string) PatchFile {

@@ -10,54 +10,52 @@ First you need to copy *transport.toml.example* to *transport.toml* and insert y
 
 Once configured, create a base patch:
 ```
-tp base C:/path_to_app
-base:271df855-2056-4bd5-b6ba-f7d14857820e
+./transport-cli base C:/path_to_app
 ```
 Upload the patch:
 ```
-tp commit latest base:271df855-2056-4bd5-b6ba-f7d14857820e
+./transport-cli commit latest
 ```
 
 Test the download:
 ```
-tp restore latest C:/app_release_test
+./transport-cli restore latest C:/app_release_test
 ```
 
 Create patch:
 ```
-tp patch latest C:/path_to_app
-patch:e310512b-fefe-42d6-90b5-bca96730411a
+./transport-cli patch latest C:/path_to_app
 ```
 
 Upload the patch:
 ```powershell
-tp commit latest patch:e310512b-fefe-42d6-90b5-bca96730411a
+./transport-cli commit latest
 ```
 
 
 ## Reference
 ```powershell
-tp base {dir}
+./transport-cli base {dir}
 ```
 Create a base patch with all files included in the patch. The command will return the *patch ID* of the newly created patch. It does **not** actually create a release or upload anything.
 
 ```powershell
-tp patch {tag} {dir}
+./transport-cli patch {tag} {dir}
 ```
 Create an incremental patch with file differences included in the patch. The command will return the *patch ID* of the newly created patch. It does **not** actually create a release or upload anything.
 
 ```powershell
-tp commit {tag} {patch_guid}
+./transport-cli commit {tag} {patch_guid}
 ```
 Upload the patch and make this the newest release for the given tag.
 
 ```powershell
-tp restore {tag} {dir}
+./transport-cli restore {tag} {dir}
 ```
 Applies changes to the directory until it matches the file states stated by the tag. This installs or updates the target software.
 
 ```powershell
-tp tags
+./transport-cli tags
 ```
 Print existing tags. F.i. stable, development, latest, ...
 

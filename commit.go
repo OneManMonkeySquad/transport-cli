@@ -10,14 +10,12 @@ import (
 )
 
 func commit(backend Backend) {
-	if len(os.Args) <= 3 {
-		fmt.Println("tp commit {tag} {guid}")
+	if len(os.Args) <= 2 {
+		fmt.Println("tp commit {tag}")
 		return
 	}
 
 	updateTagName := os.Args[2]
-	fileTypeAndGuid := os.Args[3]
-
 	if strings.ContainsAny(updateTagName, " .:;'#+*~") {
 		fmt.Println("Tag name contains invalid chars", updateTagName)
 		return
@@ -25,35 +23,21 @@ func commit(backend Backend) {
 
 	var newEntryID uuid.UUID
 	var newBaseID uuid.UUID
-	var filePath string
+	filePath := "staging/staged.json"
 	var dataFiles []string
 	{
-		if strings.HasPrefix(fileTypeAndGuid, "base:") {
-			filePath = "staging/" + fileTypeAndGuid[5:] + ".json"
-			base := readBaseFile(filePath)
-			newEntryID = base.ID
-			newBaseID = uuid.Nil
-			for _, entry := range base.Entries {
-				for i := 0; i < entry.AdditionalChunks+1; i += 1 {
-					name := entry.Hash
-					if i > 0 {
-						name = fmt.Sprintf("%s_%d", name, i)
-					}
-
-					dataFiles = append(dataFiles, name)
+		patch := readPatchFile(filePath)
+		newEntryID = patch.ID
+		newBaseID = patch.BaseID
+		for _, entry := range patch.Changed {
+			for i := 0; i < entry.AdditionalChunks+1; i += 1 {
+				name := entry.Hash
+				if i > 0 {
+					name = fmt.Sprintf("%s_%d", name, i)
 				}
+
+				dataFiles = append(dataFiles, name)
 			}
-		} else if strings.HasPrefix(fileTypeAndGuid, "patch:") {
-			filePath = "staging/" + fileTypeAndGuid[6:] + ".json"
-			patch := readPatchFile(filePath)
-			newEntryID = patch.ID
-			newBaseID = patch.BaseID
-			for _, entry := range patch.Changed {
-				dataFiles = append(dataFiles, entry.Hash)
-			}
-		} else {
-			fmt.Println("Not a valid patch identifier", fileTypeAndGuid)
-			return
 		}
 	}
 

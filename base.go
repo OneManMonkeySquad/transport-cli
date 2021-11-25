@@ -21,29 +21,29 @@ func base(cfg *Config) {
 
 	srcDir := os.Args[2]
 
-	var baseFile BaseFile
+	os.RemoveAll("staging")
+	os.Mkdir("staging", 0777)
+
+	var baseFile PatchFile
 	baseFile.Version = 1
 	baseFile.ID = uuid.New()
 
-	err := processDir(cfg, srcDir, ".", &baseFile.Entries)
+	err := processDir(cfg, srcDir, ".", &baseFile.Changed)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	if len(baseFile.Entries) == 0 {
+	if len(baseFile.Changed) == 0 {
 		log.Fatal("No entries - folder empty?")
 		return
 	}
 
-	os.Mkdir("staging", 0777)
-	err = writeToJsonFile(baseFile, "staging/"+baseFile.ID.String()+".json")
+	err = writeToJsonFile(baseFile, "staging/staged.json")
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-
-	fmt.Println("base:" + baseFile.ID.String())
 }
 
 func processDir(cfg *Config, dir string, subDir string, entries *[]BaseEntry) error {
