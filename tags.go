@@ -1,15 +1,19 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
-func tags(persistence Backend) {
+func tags(persistence Backend) error {
 	db, err := downloadDatabase(persistence)
 	if err != nil {
-		fmt.Println("Patch database not found.")
-		return
+		return errors.New("patch database not found")
 	}
 
 	for _, tag := range db.Tags {
 		fmt.Println(tag.Name)
 	}
+
+	return nil
 }

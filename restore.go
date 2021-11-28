@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,92 +21,122 @@ type FlatPatch struct {
 	Deleted []DeletedEntry
 }
 
-func restore(backend Backend) {
-	if len(os.Args) <= 3 {
-		fmt.Println("tp restore {tag} {dir}")
-		return
-	}
-
+func restore(backend Backend, tagName string, path string) error {
 	db, err := downloadDatabase(backend)
 	if err != nil {
-		fmt.Println("Patch database not found.")
-		return
+		return errors.New("patch database not found")
 	}
 
-	tagName := os.Args[2]
-	path := os.Args[3]
 	fmt.Printf("Restoring '%s'...\n", tagName)
 
 	head := db.findTag(tagName)
-
 	restoreChain := findRestoreChain(db, head)
 
 	// Now, instead of just going through patches, we collapse them into one.
 	// This way we don't write a single file multiple times or write and then delete a file.
 	flatPatch, err := flattenRestoreChain(db, restoreChain, backend)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
+	}
+
+	err = os.MkdirAll(path, 0777)
+	if err != nil {
+		return err
 	}
 
 	for _, entry := range flatPatch.Entries {
 		filePath := filepath.Join(path, entry.FileName)
 
 		hashStr := ""
-
-		existingContent, err := os.ReadFile(filePath)
-		if err == nil {
-			hash := sha256.Sum256(existingContent)
-			hashStr = hex.EncodeToString(hash[:])
+		{
+			existingContent, err := os.ReadFile(filePath)
+			if err == nil {
+				hash := sha256.Sum256(existingContent)
+				hashStr = hex.EncodeToString(hash[:])
+			}
 		}
 
 		if hashStr != entry.Hash {
-			var buffer = new(bytes.Buffer)
-			for i := 0; i < entry.AdditionalChunks+1; i += 1 {
-				name := entry.Hash
-				if i > 0 {
-					name = fmt.Sprintf("%s_%d", name, i)
-				}
-
-				newContent, err := backend.DownloadFile(name)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				buffer.Write(newContent)
-			}
-
-			// Create directory
-			dirName := filepath.Dir(filePath)
-			if _, err := os.Stat(dirName); err != nil {
-				if err := os.MkdirAll(dirName, os.ModePerm); err != nil {
-					log.Fatal(err)
-					return
-				}
-			}
-
-			// Write file
-			file, err := os.Create(filePath)
+			err = write(entry, filePath, backend)
 			if err != nil {
-				log.Fatal(err)
-				return
+				return err
 			}
-
-			zlibReader, err := zlib.NewReader(buffer)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			defer zlibReader.Close()
-
-			io.Copy(file, zlibReader)
 		}
 	}
 	for _, entry := range flatPatch.Deleted {
 		filePath := filepath.Join(path, entry.FileName)
 		os.Remove(filePath)
 	}
+
+	return nil
+}
+
+func write(entry BaseEntry, filePath string, backend Backend) error {
+	var compressedContent = new(bytes.Buffer)
+
+	for i := 0; i < entry.AdditionalChunks+1; i++ {
+		name := entry.Hash
+		if i > 0 {
+			name = fmt.Sprintf("%s_%d", name, i)
+		}
+
+		newContent, err := backend.DownloadFile(name)
+		if err != nil {
+			return err
+		}
+
+		if _, err = compressedContent.Write(newContent); err != nil {
+			return err
+		}
+	}
+
+	// Create directory
+	dirName := filepath.Dir(filePath)
+	if _, err := os.Stat(dirName); err != nil {
+		if err := os.MkdirAll(dirName, os.ModePerm); err != nil {
+			return err
+		}
+	}
+
+	// Write file
+	{
+		file, err := os.Create(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		zlibReader, err := zlib.NewReader(compressedContent)
+		if err != nil {
+			return err
+		}
+		defer zlibReader.Close()
+
+		_, err = io.Copy(file, zlibReader)
+		// #todo why error?
+		if err != nil {
+			return fmt.Errorf("decompress %v: %v", filePath, err)
+		}
+	}
+
+	// Verify
+	{
+		hashStr := ""
+		{
+			existingContent, err := os.ReadFile(filePath)
+			if err == nil {
+				hash := sha256.Sum256(existingContent)
+				hashStr = hex.EncodeToString(hash[:])
+			}
+		}
+
+		if hashStr != entry.Hash {
+			fmt.Println(hashStr, " ", entry.Hash)
+			return fmt.Errorf("restore %v: consistency violation - checksum different after restore", filePath)
+		}
+	}
+
+	return nil
 }
 
 func findRestoreChain(db *Database, head uuid.UUID) []DatabaseEntry {

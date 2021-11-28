@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,14 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func base(cfg *Config) {
-	if len(os.Args) <= 2 {
-		fmt.Println("tp base {directory}")
-		return
-	}
-
-	srcDir := os.Args[2]
-
+func base(cfg *Config, srcDir string) error {
 	os.RemoveAll("staging")
 	os.Mkdir("staging", 0777)
 
@@ -31,19 +25,19 @@ func base(cfg *Config) {
 	err := processDir(cfg, srcDir, ".", &baseFile.Changed)
 	if err != nil {
 		log.Fatal(err)
-		return
+		return err
 	}
 
 	if len(baseFile.Changed) == 0 {
-		log.Fatal("No entries - folder empty?")
-		return
+		return errors.New("no entries - folder empty?")
 	}
 
 	err = writeToJsonFile(baseFile, "staging/staged.json")
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func processDir(cfg *Config, dir string, subDir string, entries *[]BaseEntry) error {
@@ -55,19 +49,20 @@ func processDir(cfg *Config, dir string, subDir string, entries *[]BaseEntry) er
 	}
 
 	for _, dirEntry := range dirEntries {
-		if !dirEntry.IsDir() {
-			entry, err := processBaseFile(cfg, dir, subDir, dirEntry.Name())
-			if err != nil {
-				return err
-			}
-
-			*entries = append(*entries, *entry)
-		} else {
+		if dirEntry.IsDir() {
 			newSubDir := filepath.Join(subDir, dirEntry.Name())
 			if err = processDir(cfg, dir, newSubDir, entries); err != nil {
 				return err
 			}
+			continue
 		}
+
+		entry, err := processBaseFile(cfg, dir, subDir, dirEntry.Name())
+		if err != nil {
+			return err
+		}
+
+		*entries = append(*entries, *entry)
 	}
 
 	return nil
@@ -85,35 +80,40 @@ func processBaseFile(cfg *Config, dir string, subDir string, fileName string) (*
 	hashStr := hex.EncodeToString(hash[:])
 
 	// Compress and write data blob
-	buf := new(bytes.Buffer)
+	compressedContent := new(bytes.Buffer)
 	{
-		zlibWriter := zlib.NewWriter(buf)
+		zlibWriter := zlib.NewWriter(compressedContent)
 		defer zlibWriter.Close()
 
 		_, err = zlibWriter.Write(content)
 		if err != nil {
 			return nil, err
 		}
+
+		err = zlibWriter.Flush()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	numChunks := (buf.Len() / cfg.ChunkSize()) + 1
+	numChunks := (compressedContent.Len() / cfg.ChunkSize()) + 1
+	if numChunks > 1024 {
+		return nil, errors.New("too many chunks")
+	}
 
-	for i := 0; i < numChunks; i += 1 {
+	for i := 0; i < numChunks; i++ {
 		name := "staging/" + hashStr
 		if i > 0 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		file, err := os.Create(name)
+		chunk := compressedContent.Next(cfg.ChunkSize())
+		err := os.WriteFile(name, chunk, 0666)
 		if err != nil {
 			return nil, err
 		}
-		defer file.Close()
 
-		_, err = file.Write(buf.Next(cfg.ChunkSize()))
-		if err != nil {
-			return nil, err
-		}
+		fmt.Println("Chunk", name, len(chunk))
 	}
 
 	// Add entry

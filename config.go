@@ -15,6 +15,13 @@ type Config struct {
 	ChunkSizeMb int
 }
 
+func NewConfig(backend Backend) *Config {
+	return &Config{
+		Backend:     backend,
+		ChunkSizeMb: 50,
+	}
+}
+
 func (cfg *Config) ChunkSize() int {
 	return cfg.ChunkSizeMb * 1024 * 1024
 }
@@ -57,9 +64,7 @@ func readConfig() (*Config, error) {
 		return nil, errors.New("unknown backend '" + backendType + "'")
 	}
 
-	config := Config{
-		ChunkSizeMb: chunkSize,
-		Backend:     backend,
-	}
-	return &config, nil
+	config := NewConfig(backend)
+	config.ChunkSizeMb = chunkSize
+	return config, nil
 }

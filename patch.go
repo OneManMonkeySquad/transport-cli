@@ -8,26 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/google/uuid"
 )
 
-func patch(cfg *Config) {
-	if len(os.Args) <= 3 {
-		fmt.Println("tp patch {tag} {directory}")
-		return
-	}
-
-	tagName := os.Args[2]
-	srcDir := os.Args[3]
-
+func patch(cfg *Config, tagName string, srcDir string) error {
 	baseFile, err := fetchBase(tagName, cfg.Backend)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	os.RemoveAll("staging")
@@ -35,11 +25,10 @@ func patch(cfg *Config) {
 
 	patch, err := createPatch(cfg, srcDir, baseFile)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
-	writeToJsonFile(patch, "staging/staged.json")
+	return writeToJsonFile(patch, "staging/staged.json")
 }
 
 func createPatch(cfg *Config, srcDir string, baseFile *PatchFile) (*PatchFile, error) {
@@ -77,7 +66,7 @@ func createPatch(cfg *Config, srcDir string, baseFile *PatchFile) (*PatchFile, e
 		hashStr := hex.EncodeToString(hash[:])
 
 		if hashStr != baseEntry.Hash {
-			changed, err := add(cfg, hashStr, baseEntry.FileName, content)
+			changed, err := processPatchFile(cfg, hashStr, baseEntry.FileName, content)
 			if err != nil {
 				return nil, err
 			}
@@ -86,7 +75,7 @@ func createPatch(cfg *Config, srcDir string, baseFile *PatchFile) (*PatchFile, e
 		}
 	}
 
-	err := foo(cfg, srcDir, existingFileSet, &patch)
+	err := processPatchDir(cfg, srcDir, existingFileSet, &patch)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +87,7 @@ func createPatch(cfg *Config, srcDir string, baseFile *PatchFile) (*PatchFile, e
 	return &patch, nil
 }
 
-func foo(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch *PatchFile) error {
+func processPatchDir(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch *PatchFile) error {
 	files, err := os.ReadDir(srcDir)
 	if err != nil {
 		return err
@@ -111,7 +100,7 @@ func foo(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch 
 		}
 
 		if file.IsDir() {
-			err := foo(cfg, filepath.Join(srcDir, file.Name()), existingFileSet, patch)
+			err := processPatchDir(cfg, filepath.Join(srcDir, file.Name()), existingFileSet, patch)
 			if err != nil {
 				return err
 			}
@@ -129,7 +118,7 @@ func foo(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch 
 		hash := sha256.Sum256(content)
 		hashStr := hex.EncodeToString(hash[:])
 
-		changed, err := add(cfg, hashStr, file.Name(), content)
+		changed, err := processPatchFile(cfg, hashStr, file.Name(), content)
 		if err != nil {
 			return err
 		}
@@ -140,33 +129,41 @@ func foo(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch 
 	return nil
 }
 
-func add(cfg *Config, hashStr string, fileName string, content []byte) (*BaseEntry, error) {
-	buf := new(bytes.Buffer)
+func processPatchFile(cfg *Config, hashStr string, fileName string, content []byte) (*BaseEntry, error) {
+	compressedContent := new(bytes.Buffer)
 	{
-		zlibWriter := zlib.NewWriter(buf)
+		zlibWriter := zlib.NewWriter(compressedContent)
 		defer zlibWriter.Close()
 
 		_, err := zlibWriter.Write(content)
 		if err != nil {
 			return nil, err
 		}
+
+		err = zlibWriter.Flush()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	numChunks := (buf.Len() / cfg.ChunkSize()) + 1
+	numChunks := (compressedContent.Len() / cfg.ChunkSize()) + 1
+	if numChunks > 1024 {
+		return nil, errors.New("too many chunks")
+	}
 
-	for i := 0; i < numChunks; i += 1 {
+	for i := 0; i < numChunks; i++ {
 		name := "staging/" + hashStr
 		if i > 0 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		f, err := os.Create(name)
-		if err != nil {
+		chunk := compressedContent.Next(cfg.ChunkSize())
+
+		if err := os.WriteFile(name, chunk, 0666); err != nil {
 			return nil, err
 		}
-		defer f.Close()
 
-		f.Write(buf.Next(cfg.ChunkSize()))
+		fmt.Println("Chunk", name, len(chunk))
 	}
 
 	var changed BaseEntry
