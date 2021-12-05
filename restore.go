@@ -113,8 +113,7 @@ func write(entry BaseEntry, filePath string, backend Backend) error {
 		defer zlibReader.Close()
 
 		_, err = io.Copy(file, zlibReader)
-		// #todo why error?
-		if err != nil {
+		if err != nil && err != io.ErrUnexpectedEOF { // Why UnexpEOF? Satan knows
 			return fmt.Errorf("decompress %v: %v", filePath, err)
 		}
 	}
@@ -134,6 +133,8 @@ func write(entry BaseEntry, filePath string, backend Backend) error {
 			fmt.Println(hashStr, " ", entry.Hash)
 			return fmt.Errorf("restore %v: consistency violation - checksum different after restore", filePath)
 		}
+
+		fmt.Println(filePath, "Hash OK")
 	}
 
 	return nil

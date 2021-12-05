@@ -112,8 +112,6 @@ func processBaseFile(cfg *Config, dir string, subDir string, fileName string) (*
 		if err != nil {
 			return nil, err
 		}
-
-		fmt.Println("Chunk", name, len(chunk))
 	}
 
 	// Add entry

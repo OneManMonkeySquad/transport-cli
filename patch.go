@@ -162,8 +162,6 @@ func processPatchFile(cfg *Config, hashStr string, fileName string, content []by
 		if err := os.WriteFile(name, chunk, 0666); err != nil {
 			return nil, err
 		}
-
-		fmt.Println("Chunk", name, len(chunk))
 	}
 
 	var changed BaseEntry

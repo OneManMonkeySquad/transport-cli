@@ -88,6 +88,7 @@ func commit(backend Backend, tagName string) error {
 			return err
 		}
 
+		fmt.Println("Uploading", dataFile, "...")
 		if err = backend.UploadFile(dataFile, data); err != nil {
 			return err
 		}
