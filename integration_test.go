@@ -38,7 +38,7 @@ func compareDirs(t *testing.T, dir string, dir2 string) {
 	}
 }
 
-func TestBaseThenCommitThenRestoreEqual(t *testing.T) {
+func TestBaseRestore(t *testing.T) {
 	backend := backends.NewLocal("local_db")
 	cfg := NewConfig(backend)
 	defer cfg.Backend.Close()
@@ -48,7 +48,7 @@ func TestBaseThenCommitThenRestoreEqual(t *testing.T) {
 
 	os.RemoveAll("out")
 
-	err := base(cfg, "base")
+	err := base(cfg, "test_data/base1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestBaseThenCommitThenRestoreEqual(t *testing.T) {
 	compareDirs(t, "out", "base")
 }
 
-func TestBaseThenCommitThenPatchThenCommitThenRestoreEqual(t *testing.T) {
+func TestPatchRestore(t *testing.T) {
 	backend := backends.NewLocal("local_db")
 	cfg := NewConfig(backend)
 	defer cfg.Backend.Close()
@@ -76,7 +76,7 @@ func TestBaseThenCommitThenPatchThenCommitThenRestoreEqual(t *testing.T) {
 
 	os.RemoveAll("out")
 
-	err := base(cfg, "base")
+	err := base(cfg, "test_data/base1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestBaseThenCommitThenPatchThenCommitThenRestoreEqual(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = patch(cfg, "latest", "derived")
+	err = patch(cfg, "latest", "test_data/patch1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,5 +101,5 @@ func TestBaseThenCommitThenPatchThenCommitThenRestoreEqual(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	compareDirs(t, "out", "derived")
+	compareDirs(t, "out", "test_data/patch1")
 }
