@@ -60,6 +60,12 @@ func readConfig() (*Config, error) {
 		host := cfg.Get("http.host").(string)
 
 		backend = backends.NewHTTP(host)
+	} else if strings.EqualFold(backendType, "s3") {
+		// #todo
+		backend, err = backends.NewS3("...", "...", "...", "...", "...")
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		return nil, errors.New("unknown backend '" + backendType + "'")
 	}

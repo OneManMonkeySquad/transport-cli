@@ -36,14 +36,9 @@ func commit(backend Backend, tagName string) error {
 
 	//
 	db, err := downloadDatabase(backend)
-	if _, ok := err.(*os.PathError); ok {
+	if err != nil {
 		fmt.Println("Existing patch database not found, creating one...")
 		db = &Database{}
-	} else if err == os.ErrNotExist {
-		fmt.Println("Existing patch database not found, creating one...")
-		db = &Database{}
-	} else if err != nil {
-		return err
 	}
 
 	// Make sure entry is unique

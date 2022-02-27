@@ -8,36 +8,6 @@ import (
 	"github.com/OneManMonkeySquad/transport-cli/backends"
 )
 
-func compareDirs(t *testing.T, dir string, dir2 string) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	foo := make(map[string][32]byte)
-	{
-		for _, entry := range entries {
-			content, _ := os.ReadFile(entry.Name())
-			foo[entry.Name()] = sha256.Sum256(content)
-		}
-	}
-
-	entries2, err := os.ReadDir(dir2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	{
-		for _, entry := range entries2 {
-			content, _ := os.ReadFile(entry.Name())
-
-			if sha256.Sum256(content) != foo[entry.Name()] {
-				t.Errorf("File %v different", entry.Name())
-			}
-		}
-	}
-}
-
 func TestBaseRestore(t *testing.T) {
 	backend := backends.NewLocal("local_db")
 	cfg := NewConfig(backend)
@@ -102,4 +72,34 @@ func TestPatchRestore(t *testing.T) {
 	}
 
 	compareDirs(t, "out", "test_data/patch1")
+}
+
+func compareDirs(t *testing.T, dir string, dir2 string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	foo := make(map[string][32]byte)
+	{
+		for _, entry := range entries {
+			content, _ := os.ReadFile(entry.Name())
+			foo[entry.Name()] = sha256.Sum256(content)
+		}
+	}
+
+	entries2, err := os.ReadDir(dir2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		for _, entry := range entries2 {
+			content, _ := os.ReadFile(entry.Name())
+
+			if sha256.Sum256(content) != foo[entry.Name()] {
+				t.Errorf("File %v different", entry.Name())
+			}
+		}
+	}
 }

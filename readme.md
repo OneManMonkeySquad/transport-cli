@@ -1,6 +1,6 @@
 # CLI for binary releases and patching 🚢
 
-CLI tool to distribute (incremental) releases to users. Different release streams are supported (via *tags*).
+CLI tool to distribute (incremental) releases to users. Different release streams (*tags* - like release, dev, ...) are supported.
 
 To host the files you need a webserver. SFTP is used to upload the files while HTTP is used to download them.
 
