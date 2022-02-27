@@ -13,7 +13,7 @@ func (pp *NullPrevPatchProvider) Changed() []BaseEntry {
 	return []BaseEntry{}
 }
 
-func base(cfg *Config, srcDir string) error {
+func version(cfg *Config, srcDir string) error {
 	pp := &NullPrevPatchProvider{}
 	return createStagedVersionOrPatch(cfg, srcDir, pp)
 }

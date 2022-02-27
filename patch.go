@@ -20,7 +20,7 @@ func NewVersionPatchProvider(baseFile *PatchFile) (*VersionPrevPatchProvider, er
 }
 
 func (pp *VersionPrevPatchProvider) ID() uuid.UUID {
-	return uuid.Nil
+	return pp.baseFile.ID
 }
 
 func (pp *VersionPrevPatchProvider) Changed() []BaseEntry {

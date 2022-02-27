@@ -1,21 +1,35 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
+
+	"github.com/alecthomas/kong"
 )
 
-func main() {
-	if len(os.Args) <= 1 {
-		fmt.Println("tp version {dir}")
-		fmt.Println("tp patch {tag} {dir}")
-		fmt.Println("tp commit {tag}")
-		fmt.Println("tp restore {tag} {dir}")
-		fmt.Println("tp tags")
-		return
-	}
+var CLI struct {
+	Version struct {
+		Directory string `arg:""`
+	} `cmd:"" help:"Create version."`
 
+	Patch struct {
+		Tag       string `arg:""`
+		Directory string `arg:""`
+	} `cmd:"" help:"Create patch relative to latest published version/patch."`
+
+	Commit struct {
+		Tag string `arg:""`
+	} `cmd:"" help:"Publish staged version/patch."`
+
+	Restore struct {
+		Tag       string `arg:""`
+		Directory string `arg:""`
+	} `cmd:"" help:"Restore the latest published version/release into directory."`
+
+	Tags struct {
+	} `cmd:"" help:"Print published tags."`
+}
+
+func main() {
 	cfg, err := readConfig()
 	if err != nil {
 		log.Fatalf("Configuration invalid: %v", err)
@@ -23,51 +37,28 @@ func main() {
 	}
 	defer cfg.Backend.Close()
 
-	command := os.Args[1]
-	switch command {
-	case "version":
-		if len(os.Args) <= 2 {
-			fmt.Println("tp version {directory}")
-			return
-		}
-		srcDir := os.Args[2]
-		err := base(cfg, srcDir)
+	ctx := kong.Parse(&CLI)
+	switch ctx.Command() {
+	case "version <directory>":
+		err := version(cfg, CLI.Version.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-	case "patch":
-		if len(os.Args) <= 3 {
-			fmt.Println("tp patch {tag} {directory}")
-			return
-		}
-		tagName := os.Args[2]
-		srcDir := os.Args[3]
-		err := patch(cfg, tagName, srcDir)
+	case "patch <tag> <directory>":
+		err := patch(cfg, CLI.Patch.Tag, CLI.Patch.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-	case "commit":
-		if len(os.Args) <= 2 {
-			fmt.Println("tp commit {tag}")
-			return
-		}
-
-		tagName := os.Args[2]
-		err := commit(cfg.Backend, tagName)
+	case "commit <tag>":
+		err := commit(cfg.Backend, CLI.Commit.Tag)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-	case "restore":
-		if len(os.Args) <= 3 {
-			fmt.Println("tp restore {tag} {dir}")
-			return
-		}
-		tagName := os.Args[2]
-		path := os.Args[3]
-		err := restore(cfg.Backend, tagName, path)
+	case "restore <tag> <directory>":
+		err := restore(cfg.Backend, CLI.Restore.Tag, CLI.Restore.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -79,6 +70,6 @@ func main() {
 		}
 
 	default:
-		log.Fatal("Unknown command", command)
+		panic(ctx.Command())
 	}
 }

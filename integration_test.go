@@ -48,7 +48,7 @@ func TestBaseRestore(t *testing.T) {
 
 	os.RemoveAll("out")
 
-	err := base(cfg, "test_data/base1")
+	err := version(cfg, "test_data/base1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestPatchRestore(t *testing.T) {
 
 	os.RemoveAll("out")
 
-	err := base(cfg, "test_data/base1")
+	err := version(cfg, "test_data/base1")
 	if err != nil {
 		t.Fatal(err)
 	}
