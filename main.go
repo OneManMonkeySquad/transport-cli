@@ -8,7 +8,7 @@ import (
 
 func main() {
 	if len(os.Args) <= 1 {
-		fmt.Println("tp base {dir}")
+		fmt.Println("tp version {dir}")
 		fmt.Println("tp patch {tag} {dir}")
 		fmt.Println("tp commit {tag}")
 		fmt.Println("tp restore {tag} {dir}")
@@ -25,9 +25,9 @@ func main() {
 
 	command := os.Args[1]
 	switch command {
-	case "base":
+	case "version":
 		if len(os.Args) <= 2 {
-			fmt.Println("tp base {directory}")
+			fmt.Println("tp version {directory}")
 			return
 		}
 		srcDir := os.Args[2]

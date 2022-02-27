@@ -63,7 +63,7 @@ func TestBaseRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	compareDirs(t, "out", "base")
+	compareDirs(t, "out", "test_data/base1")
 }
 
 func TestPatchRestore(t *testing.T) {

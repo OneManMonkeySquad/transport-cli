@@ -35,9 +35,9 @@ Upload the patch:
 
 ## Reference
 ```powershell
-./transport-cli base {dir}
+./transport-cli version {dir}
 ```
-Create a base patch with all files included in the patch. The command will return the *patch ID* of the newly created patch. It does **not** actually create a release or upload anything.
+Create a full version including all files. It does **not** actually create a release or upload anything.
 
 ```powershell
 ./transport-cli patch {tag} {dir}
