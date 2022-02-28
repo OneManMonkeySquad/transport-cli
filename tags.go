@@ -1,17 +1,16 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 )
 
-func tags(persistence Backend) error {
-	db, err := downloadDatabase(persistence)
+func tags(metaHive MetaHive) error {
+	tags, err := metaHive.Tags()
 	if err != nil {
-		return errors.New("patch database not found")
+		return err
 	}
 
-	for _, tag := range db.Tags {
+	for _, tag := range tags {
 		fmt.Println(tag.Name)
 	}
 

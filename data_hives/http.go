@@ -1,4 +1,4 @@
-package backends
+package data_hives
 
 import (
 	"bytes"

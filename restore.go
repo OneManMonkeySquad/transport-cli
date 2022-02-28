@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -21,20 +20,22 @@ type FlatPatch struct {
 	Deleted []DeletedEntry
 }
 
-func restore(backend Backend, tagName string, path string) error {
-	db, err := downloadDatabase(backend)
-	if err != nil {
-		return errors.New("patch database not found")
-	}
-
+func restore(cfg *Config, tagName string, path string) error {
 	fmt.Printf("Restoring '%s'...\n", tagName)
 
-	head := db.findTag(tagName)
-	restoreChain := findRestoreChain(db, head)
+	head, err := cfg.metaHive.FindTagByName(tagName)
+	if err != nil {
+		return err
+	}
+
+	restoreChain, err := findRestoreChain(cfg.metaHive, head.Id)
+	if err != nil {
+		return err
+	}
 
 	// Now, instead of just going through patches, we collapse them into one.
 	// This way we don't write a single file multiple times or write and then delete a file.
-	flatPatch, err := flattenRestoreChain(db, restoreChain, backend)
+	flatPatch, err := flattenRestoreChain(restoreChain, cfg.dataHive)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func restore(backend Backend, tagName string, path string) error {
 		}
 
 		if hashStr != entry.Hash {
-			err = write(entry, filePath, backend)
+			err = write(entry, filePath, cfg.dataHive)
 			if err != nil {
 				return err
 			}
@@ -71,7 +72,7 @@ func restore(backend Backend, tagName string, path string) error {
 	return nil
 }
 
-func write(entry BaseEntry, filePath string, backend Backend) error {
+func write(entry BaseEntry, filePath string, backend DataHive) error {
 	var compressedContent = new(bytes.Buffer)
 
 	for i := 0; i < entry.AdditionalChunks+1; i++ {
@@ -140,55 +141,52 @@ func write(entry BaseEntry, filePath string, backend Backend) error {
 	return nil
 }
 
-func findRestoreChain(db *Database, head uuid.UUID) []DatabaseEntry {
-	var restoreChain []DatabaseEntry
+func findRestoreChain(metaHive MetaHive, head uuid.UUID) ([]uuid.UUID, error) {
+	var restoreChain []uuid.UUID
 	{
 		var currentHead = head
 		for currentHead != uuid.Nil {
-			entry := db.findEntry(currentHead)
-			if entry == nil {
-				log.Fatal("Patch not found")
-			}
+			restoreChain = append(restoreChain, currentHead)
 
-			restoreChain = append(restoreChain, *entry)
-			currentHead = entry.BaseID
+			var err error
+			currentHead, err = metaHive.FindEntry(currentHead)
+			if err != nil {
+				return nil, err
+			}
 		}
+	}
+
+	if len(restoreChain) == 0 {
+		return nil, errors.New("restore chain empty")
 	}
 
 	for i, j := 0, len(restoreChain)-1; i < j; i, j = i+1, j-1 {
 		restoreChain[i], restoreChain[j] = restoreChain[j], restoreChain[i]
 	}
-
-	return restoreChain
+	return restoreChain, nil
 }
 
-func flattenRestoreChain(db *Database, restoreChain []DatabaseEntry, persistence Backend) (*FlatPatch, error) {
+func flattenRestoreChain(restoreChain []uuid.UUID, persistence DataHive) (*FlatPatch, error) {
 	entryMap := make(map[string]BaseEntry)
 	deletedMap := make(map[string]DeletedEntry)
 
 	for i, entry := range restoreChain {
-		patchContent, err := persistence.DownloadFile(entry.ID.String() + ".json")
+		patchContent, err := persistence.DownloadFile(entry.String() + ".json")
+		if err != nil {
+			return nil, err
+		}
+
+		var patchFile PatchFile
+		err = json.Unmarshal(patchContent, &patchFile)
 		if err != nil {
 			return nil, err
 		}
 
 		if i == 0 {
-			var baseFile PatchFile
-			err = json.Unmarshal(patchContent, &baseFile)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, entry := range baseFile.Changed {
+			for _, entry := range patchFile.Changed {
 				entryMap[entry.FileName] = entry
 			}
 		} else {
-			var patchFile PatchFile
-			err = json.Unmarshal(patchContent, &patchFile)
-			if err != nil {
-				return nil, err
-			}
-
 			for _, entry := range patchFile.Changed {
 				entryMap[entry.FileName] = entry
 				delete(deletedMap, entry.FileName)

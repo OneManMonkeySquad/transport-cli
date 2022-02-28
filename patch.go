@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/google/uuid"
 )
@@ -28,7 +27,7 @@ func (pp *VersionPrevPatchProvider) Changed() []BaseEntry {
 }
 
 func patch(cfg *Config, tagName string, srcDir string) error {
-	baseFile, err := fetchBase(tagName, cfg.Backend)
+	baseFile, err := fetchBase(tagName, cfg.dataHive, cfg.metaHive)
 	if err != nil {
 		return err
 	}
@@ -41,25 +40,13 @@ func patch(cfg *Config, tagName string, srcDir string) error {
 	return createStagedVersionOrPatch(cfg, srcDir, pp)
 }
 
-func fetchBase(tagName string, backend Backend) (*PatchFile, error) {
-	db, err := downloadDatabase(backend)
-	if err == os.ErrNotExist {
-		return nil, errors.New("no database found; make sure you have uploaded at least one base patch")
-	} else if err != nil {
-		return nil, err
-	}
-
-	tag := db.findTag(tagName)
-	if tag == uuid.Nil {
+func fetchBase(tagName string, dataHive DataHive, metaHive MetaHive) (*PatchFile, error) {
+	tag, err := metaHive.FindTagByName(tagName)
+	if err != nil {
 		return nil, fmt.Errorf("tag '%v' not found", tagName)
 	}
 
-	entry := db.findEntry(tag)
-	if entry == nil {
-		return nil, fmt.Errorf("entry for tag '%v' not found; existing database not consistent", tagName)
-	}
-
-	entryContent, err := backend.DownloadFile(entry.ID.String() + ".json")
+	entryContent, err := dataHive.DownloadFile(tag.Id.String() + ".json")
 	if err != nil {
 		return nil, err
 	}

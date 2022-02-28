@@ -5,13 +5,34 @@ import (
 	"compress/zlib"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/google/uuid"
 )
+
+type BaseEntry struct {
+	FileName         string
+	Hash             string
+	AdditionalChunks int `json:"AdditionalChunks,omitempty"`
+}
+
+type PatchFile struct {
+	Version int
+	ID      uuid.UUID
+	BaseID  uuid.UUID
+	// Contains new and changed files
+	Changed []BaseEntry
+	Deleted []DeletedEntry
+}
+
+type DeletedEntry struct {
+	FileName string
+}
 
 type PrevPatchProvider interface {
 	ID() uuid.UUID
@@ -169,4 +190,44 @@ func processPatchFile(cfg *Config, hashStr string, fileName string, content []by
 		AdditionalChunks: numChunks - 1,
 	}
 	return &changed, nil
+}
+
+func exists(name string) (bool, error) {
+	_, err := os.Stat(name)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
+func writeToJsonFile(v interface{}, path string) error {
+	str, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, str, 0644)
+}
+
+func readPatchFile(path string) PatchFile {
+	var patchFile PatchFile
+	{
+		fileData, err := os.ReadFile(path)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = json.Unmarshal(fileData, &patchFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if patchFile.Version != 1 {
+			log.Fatal("Patch file has wrong version")
+		}
+	}
+	return patchFile
 }

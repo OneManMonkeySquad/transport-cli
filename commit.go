@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func commit(backend Backend, tagName string) error {
+func commit(cfg *Config, tagName string) error {
 	if strings.ContainsAny(tagName, " .:;'#+*~") {
 		return fmt.Errorf("invalid tag name '%v'", tagName)
 	}
@@ -34,47 +34,16 @@ func commit(backend Backend, tagName string) error {
 		}
 	}
 
-	//
-	db, err := downloadDatabase(backend)
-	if err != nil {
-		fmt.Println("Existing patch database not found, creating one...")
-		db = &Database{}
-	}
-
 	// Make sure entry is unique
-	for _, entry := range db.Entries {
-		if entry.ID == newEntryID {
-			return errors.New("entry already exists")
-		}
-	}
-
-	// Update/Insert tag
 	{
-		foundTag := false
-		for i, tag := range db.Tags {
-			if tag.Name == tagName {
-				db.Tags[i].ID = newEntryID
-				foundTag = true
-				break
-			}
+		entry, err := cfg.metaHive.FindEntry(newEntryID)
+		if err != nil {
+			return err
 		}
-		if !foundTag {
-			newTag := Tag{
-				Name: tagName,
-				ID:   newEntryID,
-			}
-			db.Tags = append(db.Tags, newTag)
-
-			fmt.Printf("Added new tag '%v'\n", tagName)
+		if entry != uuid.Nil {
+			return errors.New("entry exists already")
 		}
 	}
-
-	// Insert entry
-	newEntry := DatabaseEntry{
-		ID:     newEntryID,
-		BaseID: newBaseID,
-	}
-	db.Entries = append(db.Entries, newEntry)
 
 	// Upload datas
 	for _, dataFile := range dataFiles {
@@ -84,7 +53,7 @@ func commit(backend Backend, tagName string) error {
 		}
 
 		fmt.Println("Uploading", dataFile, "...")
-		if err = backend.UploadFile(dataFile, data); err != nil {
+		if err = cfg.dataHive.UploadFile(dataFile, data); err != nil {
 			return err
 		}
 	}
@@ -96,16 +65,17 @@ func commit(backend Backend, tagName string) error {
 			return err
 		}
 
-		err = backend.UploadFile(newEntryID.String()+".json", data)
+		err = cfg.dataHive.UploadFile(newEntryID.String()+".json", data)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Upload DB
-	if err = uploadDatabase(db, backend); err != nil {
-		return err
-	}
+	// Update/Insert tag
+	cfg.metaHive.UpdateTag(tagName, newEntryID)
+
+	// Insert entry
+	cfg.metaHive.AddEntry(newEntryID, newBaseID)
 
 	// Remove patch
 	os.Remove(filePath)

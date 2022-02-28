@@ -5,30 +5,36 @@ import (
 	"os"
 	"testing"
 
-	"github.com/OneManMonkeySquad/transport-cli/backends"
+	"github.com/OneManMonkeySquad/transport-cli/data_hives"
+	"github.com/OneManMonkeySquad/transport-cli/meta_hives"
 )
 
 func TestBaseRestore(t *testing.T) {
-	backend := backends.NewLocal("local_db")
-	cfg := NewConfig(backend)
-	defer cfg.Backend.Close()
+	metaHive, err := meta_hives.NewSqlite("local_db/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dataHive := data_hives.NewLocal("local_db")
+	cfg := NewConfig(metaHive, dataHive)
+	defer cfg.dataHive.Close()
 
 	os.RemoveAll("local_db")
 	os.MkdirAll("local_db", 0777)
 
 	os.RemoveAll("out")
 
-	err := version(cfg, "test_data/base1")
+	err = version(cfg, "test_data/base1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = commit(cfg.Backend, "latest")
+	err = commit(cfg, "latest")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = restore(cfg.Backend, "latest", "out")
+	err = restore(cfg, "latest", "out")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,21 +43,26 @@ func TestBaseRestore(t *testing.T) {
 }
 
 func TestPatchRestore(t *testing.T) {
-	backend := backends.NewLocal("local_db")
-	cfg := NewConfig(backend)
-	defer cfg.Backend.Close()
+	metaHive, err := meta_hives.NewSqlite("local_db/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dataHive := data_hives.NewLocal("local_db")
+	cfg := NewConfig(metaHive, dataHive)
+	defer cfg.dataHive.Close()
 
 	os.RemoveAll("local_db")
 	os.MkdirAll("local_db", 0777)
 
 	os.RemoveAll("out")
 
-	err := version(cfg, "test_data/base1")
+	err = version(cfg, "test_data/base1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = commit(cfg.Backend, "latest")
+	err = commit(cfg, "latest")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +72,12 @@ func TestPatchRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = commit(cfg.Backend, "latest")
+	err = commit(cfg, "latest")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = restore(cfg.Backend, "latest", "out")
+	err = restore(cfg, "latest", "out")
 	if err != nil {
 		t.Fatal(err)
 	}

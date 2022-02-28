@@ -4,26 +4,29 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/OneManMonkeySquad/transport-cli/backends"
-
 	"github.com/pelletier/go-toml"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/OneManMonkeySquad/transport-cli/data_hives"
+	"github.com/OneManMonkeySquad/transport-cli/meta_hives"
 )
 
 type Config struct {
-	Backend     Backend
-	ChunkSizeMb int
+	dataHive    DataHive
+	metaHive    MetaHive
+	chunkSizeMb int
 }
 
-func NewConfig(backend Backend) *Config {
+func NewConfig(metaHive MetaHive, dataHive DataHive) *Config {
 	return &Config{
-		Backend:     backend,
-		ChunkSizeMb: 50,
+		dataHive:    dataHive,
+		metaHive:    metaHive,
+		chunkSizeMb: 50,
 	}
 }
 
 func (cfg *Config) ChunkSize() int {
-	return cfg.ChunkSizeMb * 1024 * 1024
+	return cfg.chunkSizeMb * 1024 * 1024
 }
 
 func readConfig() (*Config, error) {
@@ -36,7 +39,7 @@ func readConfig() (*Config, error) {
 
 	backendType := cfg.Get("backend").(string)
 
-	var backend Backend
+	var dataHive DataHive
 	if strings.EqualFold(backendType, "sftp") {
 		host := cfg.Get("sftp.host").(string)
 		user := cfg.GetDefault("sftp.user", "").(string)
@@ -48,21 +51,21 @@ func readConfig() (*Config, error) {
 		}
 		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 
-		backend, err = backends.NewSFTP(host, sshConfig)
+		dataHive, err = data_hives.NewSFTP(host, sshConfig)
 		if err != nil {
 			return nil, err
 		}
 	} else if strings.EqualFold(backendType, "local") {
 		path := cfg.Get("local.path").(string)
 
-		backend = backends.NewLocal(path)
+		dataHive = data_hives.NewLocal(path)
 	} else if strings.EqualFold(backendType, "http") {
 		host := cfg.Get("http.host").(string)
 
-		backend = backends.NewHTTP(host)
+		dataHive = data_hives.NewHTTP(host)
 	} else if strings.EqualFold(backendType, "s3") {
 		// #todo
-		backend, err = backends.NewS3("...", "...", "...", "...", "...")
+		dataHive, err = data_hives.NewS3("...", "...", "...", "...", "...")
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +73,12 @@ func readConfig() (*Config, error) {
 		return nil, errors.New("unknown backend '" + backendType + "'")
 	}
 
-	config := NewConfig(backend)
-	config.ChunkSizeMb = chunkSize
+	metaHive, err := meta_hives.NewSqlite("test.db")
+	if err != nil {
+		return nil, err
+	}
+
+	config := NewConfig(metaHive, dataHive)
+	config.chunkSizeMb = chunkSize
 	return config, nil
 }

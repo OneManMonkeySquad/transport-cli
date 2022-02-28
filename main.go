@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("Configuration invalid: %v", err)
 		return
 	}
-	defer cfg.Backend.Close()
+	defer cfg.dataHive.Close()
 
 	ctx := kong.Parse(&CLI)
 	switch ctx.Command() {
@@ -52,19 +52,19 @@ func main() {
 		}
 
 	case "commit <tag>":
-		err := commit(cfg.Backend, CLI.Commit.Tag)
+		err := commit(cfg, CLI.Commit.Tag)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	case "restore <tag> <directory>":
-		err := restore(cfg.Backend, CLI.Restore.Tag, CLI.Restore.Directory)
+		err := restore(cfg, CLI.Restore.Tag, CLI.Restore.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	case "tags":
-		err := tags(cfg.Backend)
+		err := tags(cfg.metaHive)
 		if err != nil {
 			log.Fatal(err)
 		}
