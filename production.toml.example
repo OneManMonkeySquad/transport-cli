@@ -17,11 +17,6 @@ user = "..."
 pw = "..."
 subfolder = "..."
 
-# HTTP read-only backend for end users
-[http]
-host = "..."
-
-
 
 [php]
 address = "..."

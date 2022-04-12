@@ -29,8 +29,8 @@ func (cfg *Config) ChunkSize() int {
 	return cfg.chunkSizeMb * 1024 * 1024
 }
 
-func readConfig() (*Config, error) {
-	cfg, err := toml.LoadFile("transport.toml")
+func readConfig(name string) (*Config, error) {
+	cfg, err := toml.LoadFile(name)
 	if err != nil {
 		return nil, err
 	}

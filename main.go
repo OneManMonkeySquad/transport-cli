@@ -30,41 +30,69 @@ var CLI struct {
 }
 
 func main() {
-	cfg, err := readConfig()
-	if err != nil {
-		log.Fatalf("Configuration invalid: %v", err)
-		return
-	}
-	defer cfg.dataHive.Close()
-
 	ctx := kong.Parse(&CLI)
 	switch ctx.Command() {
 	case "version <directory>":
-		err := version(cfg, CLI.Version.Directory)
+		cfg, err := readConfig("production.toml")
+		if err != nil {
+			log.Fatalf("Configuration invalid: %v", err)
+			return
+		}
+		defer cfg.dataHive.Close()
+
+		err = version(cfg, CLI.Version.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	case "patch <tag> <directory>":
-		err := patch(cfg, CLI.Patch.Tag, CLI.Patch.Directory)
+		cfg, err := readConfig("production.toml")
+		if err != nil {
+			log.Fatalf("Configuration invalid: %v", err)
+			return
+		}
+		defer cfg.dataHive.Close()
+
+		err = patch(cfg, CLI.Patch.Tag, CLI.Patch.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	case "commit <tag>":
-		err := commit(cfg, CLI.Commit.Tag)
+		cfg, err := readConfig("production.toml")
+		if err != nil {
+			log.Fatalf("Configuration invalid: %v", err)
+			return
+		}
+		defer cfg.dataHive.Close()
+
+		err = commit(cfg, CLI.Commit.Tag)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	case "restore <tag> <directory>":
-		err := restore(cfg, CLI.Restore.Tag, CLI.Restore.Directory)
+		cfg, err := readConfig("release.toml")
+		if err != nil {
+			log.Fatalf("Configuration invalid: %v", err)
+			return
+		}
+		defer cfg.dataHive.Close()
+
+		err = restore(cfg, CLI.Restore.Tag, CLI.Restore.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	case "tags":
-		err := tags(cfg.metaHive)
+		cfg, err := readConfig("release.toml")
+		if err != nil {
+			log.Fatalf("Configuration invalid: %v", err)
+			return
+		}
+		defer cfg.dataHive.Close()
+
+		err = tags(cfg.metaHive)
 		if err != nil {
 			log.Fatal(err)
 		}

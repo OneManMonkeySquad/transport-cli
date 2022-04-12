@@ -1,6 +1,7 @@
 *.exe
 
-transport.toml
+production.toml
+release.toml
 test.db
 
 out/
