@@ -1,9 +1,10 @@
 *.exe
 
 transport.toml
+test.db
 
 out/
 base/
 derived/
 local_db/
-staging/
+.staging/

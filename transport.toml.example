@@ -1,18 +1,30 @@
 # Select which backend is used
 # The backend is used to store/load files, including the patch database and the patches themselves
-backend="local"
+data_hive = "local"
+meta_hive = "sqlite"
 chunk_size_mb=50
+
+
 
 # Local backend for testing
 [local]
-path="..."
+path = "..."
 
 # SFTP backend
 [sftp]
-host="..."
-user="..."
-pw="..."
+host = "..."
+user = "..."
+pw = "..."
+subfolder = "..."
 
 # HTTP read-only backend for end users
 [http]
-host="..."
+host = "..."
+
+
+
+[php]
+address = "..."
+
+[sqlite]
+file_name = "..."

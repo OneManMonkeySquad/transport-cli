@@ -1,9 +1,9 @@
 # CLI for binary releases and patching 🚢
 
-CLI tool to distribute (incremental) releases to users. Different release streams (*tags* - like release, dev, ...) are supported.
+Simple CLI tool to distribute (incremental) releases to users. Think distributing applications to test to users without annoying them.
 
-To host the files you need a webserver. SFTP is used to upload the files while HTTP is used to download them.
-
+- different release streams (*tags* - like release, dev, ...) are supported
+- binary files are compressed
 
 ## How to use
 First you need to copy *transport.toml.example* to *transport.toml* and insert your data. Note that you can use the *local* backend to get a feel for how transport works.

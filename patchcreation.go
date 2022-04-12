@@ -40,15 +40,15 @@ type PrevPatchProvider interface {
 }
 
 func createStagedVersionOrPatch(cfg *Config, srcDir string, pp PrevPatchProvider) error {
-	os.RemoveAll("staging")
-	os.Mkdir("staging", 0777)
+	os.RemoveAll(".staging")
+	os.Mkdir(".staging", 0777)
 
 	patch, err := createPatch(cfg, srcDir, pp)
 	if err != nil {
 		return err
 	}
 
-	return writeToJsonFile(patch, "staging/staged.json")
+	return writeToJsonFile(patch, ".staging/staged.json")
 }
 
 func createPatch(cfg *Config, srcDir string, pp PrevPatchProvider) (*PatchFile, error) {
@@ -95,7 +95,7 @@ func createPatch(cfg *Config, srcDir string, pp PrevPatchProvider) (*PatchFile, 
 		}
 	}
 
-	err := processPatchDir(cfg, srcDir, existingFileSet, &patch)
+	err := processPatchDir(cfg, srcDir, "", existingFileSet, &patch)
 	if err != nil {
 		return nil, err
 	}
@@ -107,24 +107,23 @@ func createPatch(cfg *Config, srcDir string, pp PrevPatchProvider) (*PatchFile, 
 	return &patch, nil
 }
 
-func processPatchDir(cfg *Config, srcDir string, existingFileSet map[string]struct{}, patch *PatchFile) error {
+func processPatchDir(cfg *Config, srcDir string, currentSubDir string, existingFileSet map[string]struct{}, patch *PatchFile) error {
 	files, err := os.ReadDir(srcDir)
 	if err != nil {
 		return err
 	}
 
 	for _, file := range files {
-		_, exists := existingFileSet[file.Name()]
+		_, exists := existingFileSet[filepath.Join(currentSubDir, file.Name())]
 		if exists {
 			continue
 		}
 
 		if file.IsDir() {
-			err := processPatchDir(cfg, filepath.Join(srcDir, file.Name()), existingFileSet, patch)
+			err := processPatchDir(cfg, filepath.Join(srcDir, file.Name()), filepath.Join(currentSubDir, file.Name()), existingFileSet, patch)
 			if err != nil {
 				return err
 			}
-
 			continue
 		}
 
@@ -138,7 +137,7 @@ func processPatchDir(cfg *Config, srcDir string, existingFileSet map[string]stru
 		hash := sha256.Sum256(content)
 		hashStr := hex.EncodeToString(hash[:])
 
-		changed, err := processPatchFile(cfg, hashStr, file.Name(), content)
+		changed, err := processPatchFile(cfg, hashStr, filepath.Join(currentSubDir, file.Name()), content)
 		if err != nil {
 			return err
 		}
@@ -172,7 +171,7 @@ func processPatchFile(cfg *Config, hashStr string, fileName string, content []by
 	}
 
 	for i := 0; i < numChunks; i++ {
-		name := "staging/" + hashStr
+		name := ".staging/" + hashStr
 		if i > 0 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}

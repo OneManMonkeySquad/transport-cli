@@ -16,7 +16,7 @@ func commit(cfg *Config, tagName string) error {
 
 	var newEntryID uuid.UUID
 	var newBaseID uuid.UUID
-	filePath := "staging/staged.json"
+	filePath := ".staging/staged.json"
 	var dataFiles []string
 	{
 		patch := readPatchFile(filePath)
@@ -47,7 +47,7 @@ func commit(cfg *Config, tagName string) error {
 
 	// Upload datas
 	for _, dataFile := range dataFiles {
-		data, err := os.ReadFile("staging/" + dataFile)
+		data, err := os.ReadFile(".staging/" + dataFile)
 		if err != nil {
 			return err
 		}
@@ -71,17 +71,13 @@ func commit(cfg *Config, tagName string) error {
 		}
 	}
 
-	// Update/Insert tag
 	cfg.metaHive.UpdateTag(tagName, newEntryID)
-
-	// Insert entry
 	cfg.metaHive.AddEntry(newEntryID, newBaseID)
 
 	// Remove patch
 	os.Remove(filePath)
-
 	for _, dataFile := range dataFiles {
-		os.Remove("staging/" + dataFile)
+		os.Remove(".staging/" + dataFile)
 	}
 
 	return nil

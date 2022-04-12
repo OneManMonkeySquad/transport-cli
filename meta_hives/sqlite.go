@@ -8,11 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type Tag struct {
-	Name string
-	Id   uuid.UUID
-}
-
 type SqliteMetaHive struct {
 	db *sql.DB
 }
@@ -72,7 +67,7 @@ func (p *SqliteMetaHive) FindTagByName(name string) (*Tag, error) {
 	}
 	defer rows.Close()
 
-	for rows.Next() {
+	if rows.Next() {
 		var id uuid.UUID
 		err = rows.Scan(&id)
 		if err != nil {

@@ -27,6 +27,9 @@ func restore(cfg *Config, tagName string, path string) error {
 	if err != nil {
 		return err
 	}
+	if head == nil {
+		return errors.New("tag not found")
+	}
 
 	restoreChain, err := findRestoreChain(cfg.metaHive, head.Id)
 	if err != nil {

@@ -2,25 +2,33 @@ package data_hives
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
 type sftpPersistence struct {
-	client *sftp.Client
+	client    *sftp.Client
+	subfolder string
 }
 
-func NewSFTP(host string, config *ssh.ClientConfig) (*sftpPersistence, error) {
+func NewSFTP(host string, subfolder string, config *ssh.ClientConfig) (*sftpPersistence, error) {
 	client, err := connectSFTP(host, config)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(subfolder) > 0 && !strings.HasSuffix(subfolder, "/") {
+		subfolder += "/"
+	}
+
 	return &sftpPersistence{
-		client: client,
+		client:    client,
+		subfolder: subfolder,
 	}, nil
 }
 
@@ -29,7 +37,10 @@ func (p *sftpPersistence) Close() {
 }
 
 func (p *sftpPersistence) UploadFile(fileName string, data []byte) error {
-	f, err := p.client.Create(fileName)
+	fullPath := p.subfolder + fileName
+	fmt.Println(fullPath)
+
+	f, err := p.client.Create(fullPath)
 	if err != nil {
 		return err
 	}
@@ -44,7 +55,10 @@ func (p *sftpPersistence) UploadFile(fileName string, data []byte) error {
 }
 
 func (p *sftpPersistence) DownloadFile(fileName string) ([]byte, error) {
-	f, err := p.client.Open(fileName)
+	fullPath := p.subfolder + fileName
+	fmt.Println(fullPath)
+
+	f, err := p.client.Open(fullPath)
 	if err != nil {
 		return nil, err
 	}

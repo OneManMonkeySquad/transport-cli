@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/OneManMonkeySquad/transport-cli/data_hives"
@@ -94,6 +95,10 @@ func compareDirs(t *testing.T, dir string, dir2 string) {
 	foo := make(map[string][32]byte)
 	{
 		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
 			content, _ := os.ReadFile(entry.Name())
 			foo[entry.Name()] = sha256.Sum256(content)
 		}
@@ -106,6 +111,11 @@ func compareDirs(t *testing.T, dir string, dir2 string) {
 
 	{
 		for _, entry := range entries2 {
+			if entry.IsDir() {
+				compareDirs(t, filepath.Join(dir, entry.Name()), filepath.Join(dir2, entry.Name()))
+				continue
+			}
+
 			content, _ := os.ReadFile(entry.Name())
 
 			if sha256.Sum256(content) != foo[entry.Name()] {

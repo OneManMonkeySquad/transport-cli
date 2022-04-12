@@ -37,13 +37,14 @@ func readConfig() (*Config, error) {
 
 	chunkSize := (int)(cfg.Get("chunk_size_mb").(int64))
 
-	backendType := cfg.Get("backend").(string)
+	dataHiveType := cfg.Get("data_hive").(string)
 
 	var dataHive DataHive
-	if strings.EqualFold(backendType, "sftp") {
+	if strings.EqualFold(dataHiveType, "sftp") {
 		host := cfg.Get("sftp.host").(string)
 		user := cfg.GetDefault("sftp.user", "").(string)
 		password := cfg.GetDefault("sftp.pw", "").(string)
+		subfolder := cfg.GetDefault("sftp.subfolder", "").(string)
 
 		sshConfig := &ssh.ClientConfig{
 			User: user,
@@ -51,31 +52,47 @@ func readConfig() (*Config, error) {
 		}
 		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 
-		dataHive, err = data_hives.NewSFTP(host, sshConfig)
+		dataHive, err = data_hives.NewSFTP(host, subfolder, sshConfig)
 		if err != nil {
 			return nil, err
 		}
-	} else if strings.EqualFold(backendType, "local") {
+	} else if strings.EqualFold(dataHiveType, "local") {
 		path := cfg.Get("local.path").(string)
 
 		dataHive = data_hives.NewLocal(path)
-	} else if strings.EqualFold(backendType, "http") {
+	} else if strings.EqualFold(dataHiveType, "http") {
 		host := cfg.Get("http.host").(string)
 
 		dataHive = data_hives.NewHTTP(host)
-	} else if strings.EqualFold(backendType, "s3") {
+	} else if strings.EqualFold(dataHiveType, "s3") {
 		// #todo
 		dataHive, err = data_hives.NewS3("...", "...", "...", "...", "...")
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		return nil, errors.New("unknown backend '" + backendType + "'")
+		return nil, errors.New("unknown data_hive '" + dataHiveType + "'")
 	}
 
-	metaHive, err := meta_hives.NewSqlite("test.db")
-	if err != nil {
-		return nil, err
+	metaHiveType := cfg.Get("meta_hive").(string)
+
+	var metaHive MetaHive
+	if strings.EqualFold(metaHiveType, "php") {
+		address := cfg.Get("php.address").(string)
+
+		metaHive, err = meta_hives.NewPhp(address)
+		if err != nil {
+			return nil, err
+		}
+	} else if strings.EqualFold(metaHiveType, "sqlite") {
+		fileName := cfg.Get("sqlite.file_name").(string)
+
+		metaHive, err = meta_hives.NewSqlite(fileName)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New("unknown meta_hive '" + metaHiveType + "'")
 	}
 
 	config := NewConfig(metaHive, dataHive)
